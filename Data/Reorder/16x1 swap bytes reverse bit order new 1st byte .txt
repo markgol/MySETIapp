@@ -1,0 +1,4 @@
+16,1,0
+15 14 13 12 11 10 9 8 0 1 2 3 4 5 6 7
+16x1 zero based list
+swap bytes, reverse bit order new 1st byte

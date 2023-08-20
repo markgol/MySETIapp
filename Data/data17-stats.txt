@@ -1,0 +1,13 @@
+Bitstream file stats
+File report settings:
+Header size:80
+Number of Blocks:1
+Header size per block:0
+Block size:65536
+
+Bit stats:
+Number of bits set in prologue (header):     32,  40.0%
+Number of bits set in body, block   0:    625,   1.0%
+Number of bits found in footer:     80
+Number of bits set in footer:     22,  27.5%
+Total number of bits set: 679

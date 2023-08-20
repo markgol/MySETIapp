@@ -1,0 +1,10 @@
+This only applies for writing/modyfing the software.
+
+1 - success
+0 - parameter or image header problem
+-1 memory allocation failure
+-2 open file failure
+-3 file read failure
+-4 incorect file type
+-5 file sizes mismatch
+-6 not yet implemented
