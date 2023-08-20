@@ -1,0 +1,27 @@
+Importing the .raw files into Photoshop or other imaging programs.
+
+Image header size is 32 bytes
+You can use the Image tools -> file properties to obtain:
+	width
+	height
+	# frames (channels in Photoshop)
+	pixel size in bytes (for Photoshop 1 byte->8 bits, 2 bytes -> 16 bits, 4 bytes -> 32 bits)
+
+
+Header format:
+
+#pragma pack(push, 1)
+typedef struct IMAGINGHEADER {
+	short Endian;		// 0 MAC format, -1 PC format
+	short ID;		// 0xaaaa, the header always starts with 0,ID or -1,ID
+				// A file not starting with this is not the correct filetype
+	short HeaderSize;	// number of bytes in header
+	LONG32 Xsize;		// number of columns in image (type long allows for long linear bitstreams)
+	LONG32 Ysize;		// number of rows image
+	short PixelSize;	// pixel size, 1-byte, 2-int16 (short), 4-int32 (int)
+	short NumFrames;	// Number of image frames in the file
+	short Version;		// header version  number
+				// 1 - this 32 byte header
+	short Padding[6];	// dummy entries reserved for other uses
+} IMAGINGHEADER;
+#pragma pack(pop)
