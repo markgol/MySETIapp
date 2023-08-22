@@ -33,6 +33,8 @@
 // Some function return TRUE/FALSE results
 //
 // V1.0.0.1	2023-08-20  Initial release
+// V1.1.0.1 2023-08-22	Added Image Decimation
+//                      Added Resize image file
 //
 #include "framework.h"
 #include "stdio.h"
@@ -2306,8 +2308,8 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 			return -3;
 		}
 	}
-
 	fclose(TextIn);
+
 	int FrameOffset;
 	for (int Frame = 0; Frame < ImageHeader.NumFrames; Frame++) {
 		FrameOffset = Frame * ImageHeader.Xsize * ImageHeader.Ysize;
@@ -2772,6 +2774,298 @@ int MirrorImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 	delete[] OutputImage;
 	fclose(Out);
 
+	if (DisplayResults) {
+		DisplayImage(OutputFile);
+	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
+// ResizeImage
+// 
+// This function is used to be used to change the Pixel size (in bytes) from the
+// old image to the new image.
+//
+// This can also be used to change the x,y size of the image.  This useful for
+// converting a linear image file into a 2D image file.
+// 
+// This copies an image file in one size format to a new size format.
+// 
+// Limitations:  old image Xsize*Ysize must equal Xsize*Ysize of new image file
+//  
+// If the new Pixels size is smaller than the old pixel size then the values will
+// be clipped as follows:
+//		1 byte	- clipped at 255
+//		2 bytes	- clipped at 65535
+//		4 bytes - negative numbers will be set to 0
+// 
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* InputFile		Image file to sum next wnext file
+//	WCHAR* OutputFile		Resized image file
+//	int Xsize				New x size (width)
+//	int Ysize				New y size (length)
+//	int PixelSize			New Pixel size in bytes (must be 1,2 or 4)
+// 
+//  return value:
+//  1 - Success
+//  !=1 Error see standardized app error list at top of this source file
+//
+//*******************************************************************************
+int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize)
+{
+	int* InputImage;
+	IMAGINGHEADER ImageHeader;
+	errno_t ErrNum;
+	PIXEL Pixel;
+	FILE* Out;
+
+	LoadImageFile(&InputImage, InputFile, &ImageHeader);
+	if (ImageHeader.Xsize * ImageHeader.Ysize != Xsize * Ysize) {
+		delete[] InputImage;
+		return 0;
+	}
+
+	ImageHeader.Xsize = Xsize;
+	ImageHeader.Ysize = Ysize;
+	ImageHeader.PixelSize = PixelSize;
+
+	// write out new image file
+	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+	if (Out == NULL) {
+		delete[] InputImage;
+		return -2;
+	}
+
+	//write output image
+	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
+
+	// write image
+	for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize * ImageHeader.NumFrames); i++) {
+		Pixel.Long = InputImage[i];
+		if (ImageHeader.PixelSize == 1) {
+			if (Pixel.Long > 255) Pixel.Long = 255;
+			fwrite(&Pixel.Byte, 1, 1, Out);
+		}
+		else if (ImageHeader.PixelSize == 2) {
+			if (Pixel.Long > 65535) Pixel.Long = 65535;
+			fwrite(&Pixel.Short, 2, 1, Out);
+		}
+		else {
+			fwrite(&Pixel.Long, 4, 1, Out);
+		}
+	}
+	fclose(Out);
+	delete[] InputImage;
+
+	if (DisplayResults) {
+		DisplayImage(OutputFile);
+	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
+// DecimateImage
+// 
+// This copies an image file in one size romat to a new size format
+// Limitations:
+// Xsize and Ysize of input image must be divisible by the X,Y size of the
+// decimation kernel
+// The # of pixels decimated in each row in the kernel must be the same
+// with the exception if the entire row is decimated.  Then the entire row is deleted
+// exmaple:
+// 2,2
+// 0 0
+// 0 1
+// This deletes every even numbered pixel in a row
+// and every even numbered row
+// 
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* InputFile		input image file
+//	WCHAR* TextFile			Text file containing decimation kernel
+//	WCHAR* OutputFile		Resized image file
+//	int	   ScalePixel
+// 
+//  return value:
+//  1 - Success
+//  !=1 Error see standardized app error list at top of this source file
+//
+//*******************************************************************************
+int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int ScalePixel)
+{
+	int* InputImage;
+	int* OutputImage;
+	int* Kernel;
+	IMAGINGHEADER ImageHeader;
+	errno_t ErrNum;
+	PIXEL Pixel;
+	FILE* Out;
+	FILE* TextIn;
+	int iRes;
+	int KernelXsize;
+	int KernelYsize;
+
+	LoadImageFile(&InputImage, InputFile, &ImageHeader);
+
+	// read decimation kernel
+	ErrNum = _wfopen_s(&TextIn, TextFile, L"r");
+	if (!TextIn) {
+		return -2;
+	}
+
+
+	iRes = fscanf_s(TextIn, "%d,%d", &KernelXsize, &KernelYsize);
+	if (iRes != 2) {
+		fclose(TextIn);
+		delete[] InputImage;
+		return -3;
+	}
+
+	Kernel = new int[(size_t)KernelXsize * (size_t)KernelYsize];
+	if (Kernel == NULL) {
+		fclose(TextIn);
+		delete[] InputImage;
+		return -1;
+	}
+
+	for (int i = 0; i < (KernelXsize * KernelYsize); i++) {
+		Kernel[i] = 0;
+		iRes = fscanf_s(TextIn, "%d", &Kernel[i]);
+		if (iRes != 1) {
+			delete[] Kernel;
+			fclose(TextIn);
+			delete[] InputImage;
+			return -3;
+		}
+		if (Kernel[i] < 0 || Kernel[i]>1) {
+			// kernel values can only be 0 or 1
+			delete [] Kernel;
+			fclose(TextIn);
+			delete[] InputImage;
+			return 0;
+		}
+	}
+	fclose(TextIn);
+
+	// verify the decimation kernel
+	int NumFoundinRow = -1;
+	int NumBlankRows = 0;
+	BOOL BlankRow;
+	int Offset;
+	int NumSetinRow;
+
+	for (int y = 0; y < KernelYsize; y++) {
+		Offset = y * KernelXsize;
+		NumSetinRow = 0;
+		BlankRow = TRUE;
+		for (int x = 0; x < KernelXsize; x++) {
+			if (Kernel[x + Offset]!=0) {
+				NumSetinRow++;
+				BlankRow = FALSE;
+			}
+		}
+		if (!BlankRow) {
+			if (NumFoundinRow < 0) {
+				// set dx to the number of 
+				NumFoundinRow = NumSetinRow;
+			}
+			else if (NumFoundinRow != NumSetinRow) {
+				// the number of bits decmiated in a row must be the same size
+				// for all nonblank rows
+				delete[] Kernel;
+				delete[] InputImage;
+				return 0;
+			}
+		}
+		else {
+			NumBlankRows++; // increment blank row count
+		}
+	}
+
+	if (NumFoundinRow == 0) {
+		delete[] Kernel;
+		delete[] InputImage;
+		return 0;
+	}
+
+	int OutXsize;
+	int OutYsize;
+
+	OutXsize = NumFoundinRow * (ImageHeader.Xsize / KernelXsize);
+	OutYsize = ImageHeader.Ysize - NumBlankRows;
+
+	// Apply decimation kernel
+	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize * (size_t)ImageHeader.NumFrames];
+	if (OutputImage == NULL) {
+		delete[] InputImage;
+		return -1;
+	}
+
+	int Kaddress;
+	int i, j;
+	int Keep;
+
+	for (int FrameNum = 0; FrameNum < ImageHeader.NumFrames; FrameNum++) {
+		i = 0;
+		for (int y = 0; y < ImageHeader.Ysize; y++) {
+			j = i * OutXsize;
+			Offset = y * ImageHeader.Xsize;
+			BlankRow = TRUE;
+			for (int x = 0; x < ImageHeader.Xsize; x++) {
+				Kaddress = (x % KernelXsize) + (y % KernelYsize) * KernelXsize;
+				Keep = (int)Kernel[Kaddress];
+				if (Keep == 0) continue;
+				OutputImage[j] = InputImage[Offset + x];
+				j++;
+				BlankRow = FALSE;
+			}
+			if (!BlankRow) i++;
+
+		}
+	}
+
+	delete[] InputImage;
+
+	// update header
+	ImageHeader.Xsize = OutXsize;
+	ImageHeader.Ysize = OutYsize;
+
+	//write output image
+	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+	if (Out == NULL) {
+		delete[] InputImage;
+		return -2;
+	}
+
+	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
+
+	// write image
+	for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize * ImageHeader.NumFrames); i++) {
+		Pixel.Long = OutputImage[i];
+		if (ScalePixel && (Pixel.Long > 1)) {
+			Pixel.Long = 255;
+		}
+		if (ImageHeader.PixelSize == 1) {
+			if (Pixel.Long > 255) Pixel.Long = 255;
+			fwrite(&Pixel.Byte, 1, 1, Out);
+		}
+		else if (ImageHeader.PixelSize == 2) {
+			if (Pixel.Long > 65535) Pixel.Long = 65535;
+			fwrite(&Pixel.Short, 2, 1, Out);
+		}
+		else {
+			fwrite(&Pixel.Long, 4, 1, Out);
+		}
+	}
+
+	fclose(Out);
+	delete[] OutputImage;
+	
 	if (DisplayResults) {
 		DisplayImage(OutputFile);
 	}

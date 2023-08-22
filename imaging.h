@@ -12,7 +12,7 @@ typedef struct IMAGINGHEADER {
 	short NumFrames;	// Number of image frames in the file
 	short Version;		// header version  number
 						// 1 - this 32 byte header
-	short Padding[6];	// dummy entry reserved for other uses
+	short Padding[6];	// dummy entries reserved for other uses
 } IMAGINGHEADER;
 #pragma pack(pop)
 
@@ -70,3 +70,7 @@ int CalculateConvPixel(int x, int y, int* Image, float* Kernel, int KernelXsize,
 void Convolve(float* Kernel, int KernelXsize, int KernelYsize, int* Image, int* NewImage, int xsize, int ysize);
 
 int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int DecomYsize);
+
+int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize);
+
+int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int ScalePixel);

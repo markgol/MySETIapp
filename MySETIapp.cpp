@@ -57,6 +57,10 @@
 // These covers many of the requests people have had in the Discord group
 //
 // V1.0.0.1 2023-08-20, Initial Release
+// V1.1.0.1 2023-08-22, Added file type specifications to open/save dialogs
+//                      Added Image Decimation
+//                      Added Resize image file
+//                      Interim display solution using external viewer
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -146,6 +150,8 @@ INT_PTR CALLBACK    ConvolutionImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    AddImagesImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    RotateDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    MirrorDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    DecimationDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    ResizeDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    GlobalSettingsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ImageDlg(HWND, UINT, WPARAM, LPARAM);
 
@@ -158,6 +164,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     // TODO: Place code here.
+    // HeapSetInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
+
+    // 
     // Get version information, executable name including path to executable location
     if (!GetProductAndVersion(&strProductName,
         &strProductVersion,
@@ -312,7 +321,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDC_FILE_OPEN:
             {
                 PWSTR pszFilename;
-                if (!CCFileOpen(hWnd, szCurrentFilename, &pszFilename, FALSE)) {
+                COMDLG_FILTERSPEC AllType[] =
+                {
+                     { L"Image files", L"*.raw" },
+                     { L"BMP files", L"*.bmp" },
+                     { L"All Files", L"*.*" },
+                };
+
+                if (!CCFileOpen(hWnd, szCurrentFilename, &pszFilename, FALSE, 3, AllType, L".raw")) {
                     return (INT_PTR)TRUE;
                 }
                 {
@@ -326,7 +342,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                     iRes = DisplayImage(szCurrentFilename);
                     if (iRes != 1) {
-                        MessageBox(hWnd, L"Error opening image/BMP for display", L"File Incompatible", MB_OK);
+                        MessageBox(hWnd, L"Error opening image/BMP for display\nMake sure BMP file set inProperties->Settings\n", L"File Incompatible", MB_OK);
                     }
                     else {
                         ShowWindow(hwndImage, SW_SHOW);
@@ -382,7 +398,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_IMGTOOLS_PROPERTIES:
             {
                 PWSTR pszFilename;
-                if (!CCFileOpen(hWnd, szCurrentFilename, &pszFilename, FALSE)) {
+                COMDLG_FILTERSPEC ImageType[] =
+                {
+                     { L"Image files", L"*.raw" },
+                     { L"All Files", L"*.*" },
+                };
+                if (!CCFileOpen(hWnd, szCurrentFilename, &pszFilename, FALSE, 2, ImageType, L".raw")) {
                     return (INT_PTR)TRUE;
                 }
                 {
@@ -452,6 +473,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case IDM_IMAGETOOLS_MIRROR:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_MIRROR), hWnd, MirrorDlg);
+                break;
+
+            case IDM_IMAGETOOLS_DECIMATION:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_DECIMATION), hWnd, DecimationDlg);
+                break;
+
+            case IDM_IMAGETOOLS_RESIZE:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_RESIZE), hWnd, ResizeDlg);
                 break;
 
             case IDM_SETTINGS:

@@ -19,6 +19,7 @@
 // This file contains the dialog callback procedures for the image tools menu
 // 
 // V1.0.0.1 2023-08-20  Initial Release
+// V1.1.0.1 2023-08-22, Added file type specifications to open/save dialogs
 //
 // Global Settings dialog box handler
 // 
@@ -84,9 +85,13 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
         case IDC_BMP_RESULTS_BROWSE:
         {
             PWSTR pszFilename;
-
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC BMPType[] =
+            {
+                 { L"BMP files", L"*.bmp" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, BMPType, L".bmp")) {
                 return (INT_PTR)TRUE;
             }
             {

@@ -19,6 +19,10 @@
 // This file contains the dialog callback procedures for the image tools menu
 // 
 // V1.0.0.1 2023-08-20  Initial Release
+// V1.1.0.1 2023-08-22, Added file type specifications to open/save dialogs
+//                      Added Image Decimation
+//                      Added Resize image file
+//                      Interim display solution using external viewer
 //
 // Imaging tools dialog box handlers
 // 
@@ -42,6 +46,7 @@
 #include "Globals.h"
 #include "FileFunctions.h"
 #include "Imaging.h"
+#include "shellapi.h"
 
 // Add new callback prototype declarations in my MySETIapp.cpp
 
@@ -93,17 +98,26 @@ INT_PTR CALLBACK ImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
             }
             // this doesn't work for most BMP files, only certain formats are allowed
             // need to find a different method.
-            ImageBMP = (HBITMAP)LoadImage(hInst, (LPCWSTR)szBMPFilename, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-
+            //ImageBMP = (HBITMAP)LoadImage(hInst, (LPCWSTR)szBMPFilename, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+            // temporary solution using external viewer
             hDC = BeginPaint(hDlg, &ps);
             if (hDC == NULL) {
                 break;
             }
+
+            // Initialize COM
+            HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+            ShellExecute(hDlg, 0, szBMPFilename, 0, 0, SW_NORMAL);
+
+            // release COM
+            CoUninitialize();
+
             TextOut(hDC,40,20, szBMPFilename, (int) wcslen(szBMPFilename));
             if (ImageBMP == NULL) {
                 // redraw image, newer method need to be used
-                TextOut(hDC, 40, 40, L"Not yet implemented", 19);
-                TextOut(hDC, 40, 60, L"Use external BMP viewer until then", 34);
+                TextOut(hDC, 40, 40, L"Temporay solution", 17);
+                TextOut(hDC, 40, 60, L"using external BMP viewer", 25);
             }
             // older methods deleted, needs updating
             EndPaint(hDlg, &ps);
@@ -140,7 +154,7 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 
     case WM_INITDIALOG:
         IMAGINGHEADER ImageHeader;
-        GetPrivateProfileString(L"ExtractImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ExtractImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
 
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
@@ -154,7 +168,7 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"ExtractImageDlg", L"ImageOutput", L"Extracted.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ExtractImageDlg", L"ImageOutput", L"Data\\Extracted.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"ExtractImageDlg", L"xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -210,7 +224,12 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -238,7 +257,12 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            }; 
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -366,7 +390,7 @@ INT_PTR CALLBACK AppendEndImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -379,10 +403,10 @@ INT_PTR CALLBACK AppendEndImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageInput2", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageInput2", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString);
 
-        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageOutput", L"AppendedEnd.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageOutput", L"Data\\AppendedEnd.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
         {
             int IncrFrames;
@@ -406,7 +430,13 @@ INT_PTR CALLBACK AppendEndImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -436,7 +466,12 @@ INT_PTR CALLBACK AppendEndImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -457,7 +492,12 @@ INT_PTR CALLBACK AppendEndImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             PWSTR pszFilename;
 
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -532,7 +572,7 @@ INT_PTR CALLBACK AppendRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -545,10 +585,10 @@ INT_PTR CALLBACK AppendRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageInput2", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageInput2", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString);
 
-        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageOutput", L"AppendedRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageOutput", L"Data\\AppendedRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         return (INT_PTR)TRUE;
@@ -562,7 +602,12 @@ INT_PTR CALLBACK AppendRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -592,7 +637,12 @@ INT_PTR CALLBACK AppendRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -613,7 +663,12 @@ INT_PTR CALLBACK AppendRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             PWSTR pszFilename;
 
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -680,7 +735,7 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         int ScalePixel;
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"ReorderImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ReorderImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -693,10 +748,10 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"ReorderImageDlg", L"TextInput", L"reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ReorderImageDlg", L"TextInput", L"Data\\Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
 
-        GetPrivateProfileString(L"ReorderImageDlg", L"ImageOutput", L"Reordered.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ReorderImageDlg", L"ImageOutput", L"Data\\Reordered.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         ScalePixel = GetPrivateProfileInt(L"ReorderImageDlg", L"ScalePixel", 0, (LPCTSTR)strAppNameINI);
@@ -717,7 +772,12 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -745,7 +805,12 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, textType, L"*.txt")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -760,7 +825,12 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -833,7 +903,7 @@ INT_PTR CALLBACK FoldLeftImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"FoldLeftImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldLeftImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -846,7 +916,7 @@ INT_PTR CALLBACK FoldLeftImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"FoldLeftImageDlg", L"ImageOutput", L"FoldLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldLeftImageDlg", L"ImageOutput", L"Data\\FoldLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"FoldLeftImageDlg", L"FoldColumn", L"128", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -863,7 +933,12 @@ INT_PTR CALLBACK FoldLeftImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -891,7 +966,12 @@ INT_PTR CALLBACK FoldLeftImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -955,7 +1035,7 @@ INT_PTR CALLBACK FoldRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"FoldRightImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldRightImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -968,7 +1048,7 @@ INT_PTR CALLBACK FoldRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"FoldRightImageDlg", L"ImageOutput", L"FoldRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldRightImageDlg", L"ImageOutput", L"Data\\FoldRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"FoldRightImageDlg", L"FoldColumn", L"128", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -985,7 +1065,12 @@ INT_PTR CALLBACK FoldRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L".raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1013,7 +1098,12 @@ INT_PTR CALLBACK FoldRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1077,7 +1167,7 @@ INT_PTR CALLBACK FoldDownImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"FoldDownImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldDownImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1090,7 +1180,7 @@ INT_PTR CALLBACK FoldDownImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"FoldDownImageDlg", L"ImageOutput", L"FoldDown.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldDownImageDlg", L"ImageOutput", L"Data\\FoldDown.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"FoldDownImageDlg", L"FoldRow", L"128", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1107,7 +1197,12 @@ INT_PTR CALLBACK FoldDownImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1135,7 +1230,12 @@ INT_PTR CALLBACK FoldDownImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1199,7 +1299,7 @@ INT_PTR CALLBACK FoldUpImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"FoldUpImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldUpImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1212,7 +1312,7 @@ INT_PTR CALLBACK FoldUpImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"FoldUpImageDlg", L"ImageOutput", L"FoldUp.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldUpImageDlg", L"ImageOutput", L"Data\\FoldUp.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"FoldUpImageDlg", L"FoldRow", L"128", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1229,7 +1329,12 @@ INT_PTR CALLBACK FoldUpImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1257,7 +1362,12 @@ INT_PTR CALLBACK FoldUpImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1321,7 +1431,7 @@ INT_PTR CALLBACK LeftAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"LeftAccordionImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"LeftAccordionImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1334,7 +1444,7 @@ INT_PTR CALLBACK LeftAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"LeftAccordionImageDlg", L"ImageOutput", L"AccordionLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"LeftAccordionImageDlg", L"ImageOutput", L"Data\\AccordionLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"LeftAccordionImageDlg", L"AccordionSize", L"16", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1351,7 +1461,12 @@ INT_PTR CALLBACK LeftAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1379,7 +1494,12 @@ INT_PTR CALLBACK LeftAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1442,7 +1562,7 @@ INT_PTR CALLBACK RightAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, 
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"RightAccordionImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"RightAccordionImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1455,7 +1575,7 @@ INT_PTR CALLBACK RightAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, 
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"RightAccordionImageDlg", L"ImageOutput", L"AccordionRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"RightAccordionImageDlg", L"ImageOutput", L"Data\\AccordionRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"RightAccordionImageDlg", L"AccordionSize", L"16", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1472,7 +1592,12 @@ INT_PTR CALLBACK RightAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, 
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1500,7 +1625,12 @@ INT_PTR CALLBACK RightAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, 
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1563,7 +1693,7 @@ INT_PTR CALLBACK LeftShiftRowsImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"LeftShiftRowsImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"LeftShiftRowsImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1576,7 +1706,7 @@ INT_PTR CALLBACK LeftShiftRowsImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"LeftShiftRowsImageDlg", L"ImageOutput", L"ShiftLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"LeftShiftRowsImageDlg", L"ImageOutput", L"Data\\ShiftLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         return (INT_PTR)TRUE;
@@ -1590,7 +1720,12 @@ INT_PTR CALLBACK LeftShiftRowsImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1618,7 +1753,12 @@ INT_PTR CALLBACK LeftShiftRowsImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1676,7 +1816,7 @@ INT_PTR CALLBACK ConvolutionImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"ConvolutionImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ConvolutionImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1689,10 +1829,10 @@ INT_PTR CALLBACK ConvolutionImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"ConvolutionImageDlg", L"TextInput", L"Kernel.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ConvolutionImageDlg", L"TextInput", L"Data\\Convolution\\Kernel.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
 
-        GetPrivateProfileString(L"ConvolutionImageDlg", L"ImageOutput", L"Convolved.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ConvolutionImageDlg", L"ImageOutput", L"Data\\Convolved.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         return (INT_PTR)TRUE;
@@ -1706,7 +1846,12 @@ INT_PTR CALLBACK ConvolutionImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1734,7 +1879,12 @@ INT_PTR CALLBACK ConvolutionImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, textType, L"*.txt")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1749,7 +1899,12 @@ INT_PTR CALLBACK ConvolutionImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1813,7 +1968,7 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"AddImagesImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AddImagesImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1826,7 +1981,7 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"AddImagesImageDlg", L"ImageInput2", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AddImagesImageDlg", L"ImageInput2", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI2, ImageHeader.Xsize, TRUE);
@@ -1853,7 +2008,12 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1883,7 +2043,12 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1913,7 +2078,12 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             PWSTR pszFilename;
 
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -1978,7 +2148,7 @@ INT_PTR CALLBACK MirrorDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"MirrorDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"MirrorDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1991,7 +2161,7 @@ INT_PTR CALLBACK MirrorDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"MirrorDlg", L"ImageOutput", L"Mirrored.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"MirrorDlg", L"ImageOutput", L"Data\\Mirrored.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         int Direction = GetPrivateProfileInt(L"MirrorDlg", L"Direction", 0, (LPCTSTR)strAppNameINI);
@@ -2013,7 +2183,12 @@ INT_PTR CALLBACK MirrorDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -2041,7 +2216,12 @@ INT_PTR CALLBACK MirrorDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -2112,7 +2292,7 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"RotateDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"RotateDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -2125,7 +2305,7 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"RotateDlg", L"ImageOutput", L"Rotated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"RotateDlg", L"ImageOutput", L"Data\\Rotated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         int Direction = GetPrivateProfileInt(L"RotateDlg", L"Direction", 0, (LPCTSTR)strAppNameINI);
@@ -2147,7 +2327,12 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             IMAGINGHEADER ImageHeader;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -2175,7 +2360,12 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
         {
             PWSTR pszFilename;
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
-            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE)) {
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -2230,3 +2420,352 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
     }
     return (INT_PTR)FALSE;
 }
+
+//*******************************************************************************
+//
+// Message handler for ResizeDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        IMAGINGHEADER ImageHeader;
+
+        GetPrivateProfileString(L"ResizeDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, ImageHeader.PixelSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"ResizeDlg", L"ImageOutput", L"Data\\Resized.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        GetDlgItemText(hDlg, IDC_XSIZEI, szString, MAX_PATH);
+        GetPrivateProfileString(L"ResizeDlg", L"Xsize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XSIZE, szString);
+
+        GetDlgItemText(hDlg, IDC_YSIZEI, szString, MAX_PATH);
+        GetPrivateProfileString(L"ResizeDlg", L"Ysize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YSIZE, szString);
+
+        GetDlgItemText(hDlg, IDC_PIXEL_SIZEI, szString, MAX_PATH);
+        GetPrivateProfileString(L"ResizeDlg", L"PixelSize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString);
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_RESIZE:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int Xsize,Ysize;
+            int XsizeI, YsizeI;
+            int PixelSize;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+            Xsize = GetDlgItemInt(hDlg, IDC_XSIZE, &bSuccess, TRUE);
+            Ysize = GetDlgItemInt(hDlg, IDC_YSIZE, &bSuccess, TRUE);
+            XsizeI = GetDlgItemInt(hDlg, IDC_XSIZEI, &bSuccess, TRUE);
+            YsizeI = GetDlgItemInt(hDlg, IDC_YSIZEI, &bSuccess, TRUE);
+            PixelSize = GetDlgItemInt(hDlg, IDC_PIXEL_SIZE, &bSuccess, TRUE);
+
+            if ((Xsize * Ysize) != (XsizeI * YsizeI)) {
+                MessageBox(hDlg, L"New Xsize*Ysize must equal old Xsize*Ysize", L"Bad entry", MB_OK);
+                return (INT_PTR)TRUE;
+            }
+
+            if (PixelSize!=1 && PixelSize!=2 && PixelSize!=4) {
+                MessageBox(hDlg, L"Pixel size must be 1, 2, or 4", L"Bad entry", MB_OK);
+                return (INT_PTR)TRUE;
+            }
+
+            int iRes;
+            iRes = ResizeImage(InputFile, OutputFile, Xsize, Ysize, PixelSize);
+            if (iRes != 1) {
+                MessageBox(hDlg, L"Error writing new image file", L"File I/O error", MB_OK);
+            }
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ResizeDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ResizeDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ResizeDlg", L"Xsize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ResizeDlg", L"Ysize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ResizeDlg", L"PixelSize", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
+// Message handler for DecimationDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK DecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+
+    case WM_INITDIALOG:
+    {
+        int ScalePixel;
+        IMAGINGHEADER ImageHeader;
+
+        GetPrivateProfileString(L"DecimationDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"DecimationDlg", L"TextInput", L"Data\\Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+
+        GetPrivateProfileString(L"DecimationDlg", L"ImageOutput", L"Data\\Decimated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        ScalePixel = GetPrivateProfileInt(L"DecimationDlg", L"ScalePixel", 0, (LPCTSTR)strAppNameINI);
+        if (!ScalePixel) {
+            CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_CHECKED);
+        }
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_TEXT_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, textType, L"*.txt")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_DECIMATE:
+        {
+            WCHAR InputFile[MAX_PATH];
+            WCHAR TextInput[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int ScalePixel = 0;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextInput, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+            if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
+                ScalePixel = 1;
+            }
+            
+            int iRes;
+            iRes = DecimateImage(InputFile, TextInput, OutputFile, ScalePixel);
+            if (iRes == 1) {
+                return (INT_PTR)TRUE;
+            }
+            if (iRes == 0 || iRes==-3) {
+                MessageBox(hDlg, L"Problem with decimation kernel, check formatting", L"File incompatible", MB_OK);
+                return (INT_PTR)TRUE;
+            }
+            MessageBox(hDlg, L"Error, could not process", L"I/O error", MB_OK);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"DecimationDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"DecimationDlg", L"TextInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"DecimationDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
+                WritePrivateProfileString(L"DecimationDlg", L"ScalePixel", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"DecimationDlg", L"ScalePixel", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+

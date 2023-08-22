@@ -1,0 +1,6 @@
+64,1
+0 0 0 0 0 1 1 0 1 0 0 1 0 0 0 0
+0 0 1 0 1 0 0 0 0 1 0 0 0 0 0 1
+0 1 0 0 0 1 0 0 1 0 0 0 1 0 0 0
+0 1 0 0 0 1 0 0 1 0 0 0 1 0 0 0
+16x1 linear decimation, using header as decimaton kernel

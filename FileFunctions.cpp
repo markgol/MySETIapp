@@ -43,6 +43,7 @@
 // Some function return TRUE/FALSE results
 // 
 // V1.0.0.1 2023-08-20, Initial Release
+// V1.1.0.1 2023-08-22, Added file type specifications to open/save dialogs
 //
 #include "framework.h"
 #include "resource.h"
@@ -60,11 +61,21 @@
 // Generic File Open function
 // This uses the current style file dialog for the Windows OS version
 //
-// BOOL CCFileOpen(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename)
+// BOOL CCFileOpen(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
+//                 int NumTypes, COMDLG_FILTERSPEC* FilterSpec)
 // 
 //      LPWSTR  pszCurrentFilename - if not "" then use as a default file selection
 //      LPWSTR* pszFilename - return the selected filename (inluding path) if 'Open' selected
 //      BOOL    bSelectFolder - TRUE, select only the folder not a file
+//      int     NumTypes - 0 none specifed other wise number in list
+//      COMDLG_FILTERSPEC* pointer to file types list
+//
+// example of file type specifier:
+// COMDLG_FILTERSPEC rgSpec[] =
+//{
+//    { L"Image files", L"*.raw" },
+//    { L"All Files", L"*.*" },
+//};
 // 
 // return
 //      TRUE - 'Open' selected, pszFilename is valid
@@ -72,7 +83,8 @@
 // 
 //****************************************************************
 BOOL CCFileOpen(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
-                BOOL bSelectFolder)
+                BOOL bSelectFolder, int NumTypes, COMDLG_FILTERSPEC* FileTypes,
+                LPCWSTR szDefExt)
 {
 BOOL bReturnValue = FALSE;
 // Initialize COM
@@ -89,6 +101,12 @@ if (SUCCEEDED(hr))
     {
         if (!bSelectFolder) {
             hr = pFileOpen->SetOptions(FOS_FORCEFILESYSTEM);
+            if (NumTypes != 0 && FileTypes!=NULL) {
+                hr = pFileOpen->SetFileTypes(NumTypes, FileTypes);
+            }
+            if (szDefExt != NULL) {
+                hr = pFileOpen->SetDefaultExtension(szDefExt);
+            }
         } else {
             hr = pFileOpen->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM); // This selects only a folder, not a filename
         }
@@ -137,6 +155,15 @@ return bReturnValue;
 //      LPWSTR pszCurrentFilename - if not "" then use as a default file selection
 //      LPWSTR* pszFilename - return the selected filename (inluding path) if 'Open' selected
 //      BOOL    bSelectFolder - TRUE, select only the folder not a file
+//      int     NumTypes - 0 none specifed other wise number in list
+//      COMDLG_FILTERSPEC* pointer to file types list
+//
+// example of file type specifier:
+// COMDLG_FILTERSPEC rgSpec[] =
+//{
+//    { szBMP, L"*.raw" },
+//    { szAll, L"*.*" },
+//};
 // 
 //  return
 //      TRUE - 'Open' selected, pszFilename is valid
@@ -147,7 +174,8 @@ return bReturnValue;
 // 
 //****************************************************************
 BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
-                BOOL bSelectFolder)
+                BOOL bSelectFolder, int NumTypes, COMDLG_FILTERSPEC* FileTypes,
+                LPCWSTR szDefExt)
 {
     BOOL bReturnValue = FALSE;
 
@@ -163,8 +191,14 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
 
         if (SUCCEEDED(hr))
         {
-            if (bSelectFolder) {
+            if (!bSelectFolder) {
                 hr = pFileSave->SetOptions(FOS_FORCEFILESYSTEM | FOS_OVERWRITEPROMPT);
+                if (NumTypes != 0 && FileTypes != NULL) {
+                    hr = pFileSave->SetFileTypes(NumTypes, FileTypes);
+                }
+                if (szDefExt != NULL) {
+                    hr = pFileSave->SetDefaultExtension(szDefExt);
+                }
             } else {
                 hr = pFileSave->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM); // This selects only a folder, not a filename
             }
@@ -605,20 +639,18 @@ void ExportFile(HWND hWnd, int wmId)
     int AutoScale = 0;
 
     // select name
-    if (wmId == IDM_FILE_TOBMP) {
-        wcscpy_s(szString, L"*.bmp");
-    }
-    else if (wmId == IDM_FILE_TOTXT) {
-        wcscpy_s(szString, L"*.txt");
-    }
-    else {
+    if (wmId != IDM_FILE_TOBMP && wmId != IDM_FILE_TOTXT) {
         MessageBox(hWnd, L"Export type is not supported", L"File incompatible", MB_OK);
         return;
     }
 
-    wcscpy_s(InputFile, L"*.raw");
+    COMDLG_FILTERSPEC RawType[] =
+    {
+         { L"Image files", L"*.raw" },
+         { L"All Files", L"*.*" },
+    };
 
-    if (!CCFileOpen(hWnd, InputFile, &pszFilename, FALSE)) {
+    if (!CCFileOpen(hWnd, (LPWSTR)L"", &pszFilename, FALSE, 2, RawType, L".raw")) {
         return;
     }
     wcscpy_s(InputFile, pszFilename);
@@ -659,9 +691,27 @@ void ExportFile(HWND hWnd, int wmId)
         }
     }
 
-    if (!CCFileSave(hWnd, szString, &pszFilename, FALSE)) {
-        return;
+    if (wmId == IDM_FILE_TOBMP) {
+        COMDLG_FILTERSPEC BMPType[] =
+        {
+             { L"BMP files", L"*.bmp" },
+             { L"All Files", L"*.*" },
+        };
+        if (!CCFileSave(hWnd, (LPWSTR) L"", &pszFilename, FALSE, 2, BMPType, L".bmp")) {
+            return;
+        }
     }
+    else if (wmId == IDM_FILE_TOTXT) {
+        COMDLG_FILTERSPEC TXTType[] =
+        {
+             { L"Image files", L"*.txt" },
+             { L"All Files", L"*.*" },
+        };
+        if (!CCFileSave(hWnd, (LPWSTR)L"", &pszFilename, FALSE, 2, TXTType, L".txt")) {
+            return;
+        }
+    }
+
     wcscpy_s(szString, pszFilename);
     CoTaskMemFree(pszFilename);
 

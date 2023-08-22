@@ -2,8 +2,10 @@
 // 
 // function prototypes
 //
-int CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename, BOOL bSelectFolder);
-int CCFileOpen(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename, BOOL bSelectFolder);
+BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
+    BOOL bSelectFolder, int NumTypes, COMDLG_FILTERSPEC* FileTypes, LPCWSTR szDefExt);
+BOOL CCFileOpen(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
+    BOOL bSelectFolder, int NumTypes, COMDLG_FILTERSPEC* FileTypes, LPCWSTR szDefExt);
 void SaveWindowPlacement(HWND hWnd, CString& Section);
 BOOL RestoreWindowPlacement(HWND hWnd, CString& Section);
 void LastErrorMsg(LPCTSTR lpszFunction);
