@@ -26,6 +26,8 @@ int LoadImageFile(int** ImagePtr, WCHAR* ImagingFilename, IMAGINGHEADER* header)
 
 void ReportImageHeader(HWND hDlg, WCHAR* szCurrentFilename);
 
+void ReportImageProperties(HWND hDlg, WCHAR* Filename);
+
 int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	int ScaleBinary, int SubimageXloc, int SubimageYloc, int StartFrame, int EndFrame,
 	int SubimageXsize, int SubimageYsize, int OutputXsize, int OutputYsize, int Centered);
@@ -36,9 +38,11 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 
 int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR* ImageOutputFile);
 
-int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile, int ScalePixel, int LinearOnly);
+int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile, int ScalePixel, int LinearOnly,
+				int EnableBatch, int GenerateBMP);
 
-int ReadReoderingFile(WCHAR* TextInput, int** DecomX, int** DecomY, int* DecomXsize, int* DecomYsize, int LinearOnly);
+int ReadReoderingFile(WCHAR* TextInput, int** DecomX, int** DecomY, int* DecomXsize, int* DecomYsize, int LinearOnly,
+				int EnableBatch);
 
 void ComputeReordering(int* DecomAddress, int xsize, int ysize, int* DecomX, int* DecomY,
 	int DecomXsize, int DecomYsize);
@@ -69,7 +73,7 @@ int CalculateConvPixel(int x, int y, int* Image, float* Kernel, int KernelXsize,
 
 void Convolve(float* Kernel, int KernelXsize, int KernelYsize, int* Image, int* NewImage, int xsize, int ysize);
 
-int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int DecomYsize);
+int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int DecomYsize, int NumKernels);
 
 int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize);
 

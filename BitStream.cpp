@@ -32,6 +32,7 @@
 // Some function return TRUE/FALSE results
 //
 // V1.0.0.1 2023-08-20  Initial Release
+// V1.2.0.1 2023-08-30  Added Convert text to packed bitstream file
 //
 #include "framework.h"
 #include <windowsx.h>
@@ -42,6 +43,7 @@
 #include "BitStream.h"
 #include "imaging.h"
 #include "FileFunctions.h"
+#include "strsafe.h"
 
 //*******************************************************************
 //
@@ -1087,4 +1089,92 @@ void BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
         DisplayImage(OutputFile);
     }
     return;
+}
+
+//*******************************************************************
+//
+// ConvertText2BitStream
+// 
+// Convert textfile to a packed BitStream binary file
+// 
+// Parameters:
+//  HWND hDlg               handle of calling window/dialog
+//  WCHAR* InputFile        text file with space delmited list of values
+//                          value < 0 , cause error to be returned
+//                          value = 0 is taken as bit with value 0
+//                          value > 0 is taken as bit with value 1
+//                          (file is multiple always of 8 bits)
+//  WCHAR* OutputFile       Packed Binary bit stream file
+//
+//*******************************************************************
+int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
+{
+    FILE* In;
+    FILE* Out;
+    int BitNumber;
+    int BitValue;
+    int ByteValue;
+    int iRes;
+    int TotalBits;
+    int TotalOneBits;
+    int TotalBytes;
+    errno_t ErrNum;
+
+    BitNumber = 0;
+    ByteValue = 0;
+    TotalBits = 0;
+    TotalOneBits = 0;
+    TotalBytes = 0;
+
+    ErrNum = _wfopen_s(&In, InputFile, L"r");
+    if (In == NULL) {
+        MessageBox(hDlg, L"Could not open input file", L"File I/O", MB_OK);
+        return -2;
+    }
+
+    ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+    if (Out == NULL) {
+        fclose(In);
+        MessageBox(hDlg, L"Could not open raw output file", L"File I/O", MB_OK);
+        return -2;
+    }
+
+    while (!feof(In)) {
+        iRes = fscanf_s(In, "%d", &BitValue);
+        if (iRes != 1) {
+            fclose(Out);
+            fclose(In);
+            return -3;
+        }
+        if (BitValue < 0) {
+            fclose(Out);
+            fclose(In);
+            return -3;
+        }
+        if (BitValue > 0) {
+            ByteValue = ByteValue | (0x01 << BitNumber);
+            TotalOneBits++;
+        }
+        TotalBits++;
+        BitNumber++;
+        if (BitNumber >= 8) {
+            fwrite(&ByteValue, 1, 1, Out);
+            ByteValue = 0;
+            BitNumber = 0;
+            TotalBytes++;
+        }
+    }
+
+    if (BitNumber != 0) {
+        fwrite(&ByteValue, 1, 1, Out);
+    }
+
+    TCHAR pszMessageBuf[MAX_PATH];
+    StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH, TEXT("Bitsream properties\n# of bits: %d\n# of set bits: %d\nBytes writtten: %d"),
+        TotalBits, TotalOneBits, TotalBytes);
+    MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+
+    fclose(In);
+    fclose(Out);
+    return 1;
 }

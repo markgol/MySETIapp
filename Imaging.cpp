@@ -35,6 +35,12 @@
 // V1.0.0.1	2023-08-20  Initial release
 // V1.1.0.1 2023-08-22	Added Image Decimation
 //                      Added Resize image file
+// V1.2.0.1 2023-08-31	Added image stats reporting not just image header stats
+//                      Corrected error handling of reorder list, when entry in
+//                      kernel is out of bounds, file closure on error.
+//                      Added batch processing for reordering,  This allows a series of
+//                      reorder kernels to be used.  Each kernel adds an index number
+//                      onto the output filename.
 //
 #include "framework.h"
 #include "stdio.h"
@@ -239,6 +245,81 @@ void ReportImageHeader(HWND hDlg, WCHAR* Filename)
 	TCHAR pszMessageBuf[MAX_PATH];
 	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH, TEXT("Image Pixel file Properties\n# of frames: %d\nXsize: %d\nYsize: %d\nPixelSize: %d byte(s)"),
 		(int)ImageHeader.NumFrames, (int)ImageHeader.Xsize, (int)ImageHeader.Ysize, (int)ImageHeader.PixelSize);
+	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+
+	return;
+}
+
+//*****************************************************************************************
+//
+//	ReportImageProperties
+// 
+//	Report the contents of the image file using its header and some image statistics
+// 
+// Parameters:
+//	HWND hDlg		Handle of calling window or dialog
+//	WCHAR* Filename	Image filename	
+//
+//*****************************************************************************************
+void ReportImageProperties(HWND hDlg, WCHAR* Filename)
+{
+	IMAGINGHEADER ImageHeader;
+	int* InputImage;
+	int iRes;
+
+	iRes = LoadImageFile(&InputImage, Filename, &ImageHeader);
+	if (iRes != 1) {
+		if (iRes == -2) {
+			//     -2 open file failure
+			MessageBox(hDlg, L"Could not open file", L"File error", MB_OK);
+		} else if (iRes == -3) {
+			//     -3 file read failure
+			MessageBox(hDlg, L"Read failure of file", L"File error", MB_OK);
+		}
+		else if (iRes == -4) {
+			//     -4 incorect file type
+			MessageBox(hDlg, L"This is not a image file", L"File error", MB_OK);
+		}
+		else {
+			MessageBox(hDlg, L"Problem occurred reading image file", L"File error", MB_OK);
+		}
+	}
+
+	if (ImageHeader.Endian != 0 && ImageHeader.Endian != -1) {
+		MessageBox(hDlg, L"File is not a pixel image file", L"File I/O", MB_OK);
+		return;
+	}
+
+	if (ImageHeader.ID != (short)0xaaaa) {
+		MessageBox(hDlg, L"File is not a pixel image file", L"File I/O", MB_OK);
+		return;
+	}
+
+	if (ImageHeader.HeaderSize != sizeof(IMAGINGHEADER)) {
+		MessageBox(hDlg, L"File is not a pixel image file", L"File I/O", MB_OK);
+		return;
+	}
+
+	if (ImageHeader.PixelSize != 1 && ImageHeader.PixelSize != 2 && ImageHeader.PixelSize != 4) {
+		MessageBox(hDlg, L"File is not a pixel image file", L"File I/O", MB_OK);
+		return;
+	}
+	int NonZeroPixels=0;
+	int ImageMin = InputImage[0];
+	int ImageMax = InputImage[0];
+	for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize * ImageHeader.NumFrames); i++) {
+		if (InputImage[i] > 0) NonZeroPixels++;
+		if (InputImage[i] > ImageMax) ImageMax = InputImage[i];
+		if (InputImage[i] < ImageMin) ImageMin = InputImage[i];;
+	}
+
+
+	// report contents of image header
+	TCHAR pszMessageBuf[MAX_PATH];
+	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+		TEXT("Image Pixel file Properties\n# of frames: %d\nXsize: %d\nYsize: %d\nPixelSize: %d byte(s)\nTotal non-zero pixels %d\nPixel range min: %d, max: %d"),
+		(int)ImageHeader.NumFrames, (int)ImageHeader.Xsize, (int)ImageHeader.Ysize,
+		(int)ImageHeader.PixelSize, NonZeroPixels, ImageMin,ImageMax);
 	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
 
 	return;
@@ -906,7 +987,13 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 //			becomes
 //			15 14 13 12 11 10 9 8
 //			 7  6  5  4  3  2 1 0
-//			
+//
+//	Batch processing of reordering kernels
+//	When the Enable Batch flag is set then multiple reodering kernels can be in a
+//	reordering file.  When batch processing the kernels are listed sequentially.
+//	Batch processing ends when a comment, EOF or an error in a kernel is encountered.
+//	An index number starting at 1 is added to the output filename for each kernel processed.
+// 
 // Parameters:
 //	HWND hDlg				Handle of calling window or dialog
 //	WCHAR* TextInput		Reordering file (text file)
@@ -916,7 +1003,11 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 //							pixel=0 -> 0,  pixel>0 -> 255
 //	int LinearOnly			1 - 1d image file pixel reorder
 //							0 - 2d image file pixel reorder
-// 
+//	int EnableBatch			1 - enable batch processing of kernel file
+//							0 - disable batch processing of kernel file
+//	int GenerateBMP			1 - Generate BMP file after each batch processing step
+//							0 - Do not generate BMP during batch procssing
+//							This option is only meanuingful when EnableBatch is 1.
 //  return value:
 //  1 - Success
 //  !=1 Error see standardized app error list at top of this source file
@@ -924,7 +1015,7 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 //
 //******************************************************************************
 int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile,
-				 int ScalePixel, int LinearOnly)
+				 int ScalePixel, int LinearOnly, int EnableBatch, int GenerateBMP)
 {
 	FILE* Out;
 	IMAGINGHEADER ImgHeader;
@@ -937,6 +1028,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 	int Offset;
 	int iRes;
 	int i;
+	int NumKernels;
 	unsigned char Pixel;
 	errno_t ErrNum;
 
@@ -953,7 +1045,8 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		return -4;
 	}
 
-	if(!ReadReoderingFile(TextInput, &DecomX, &DecomY, &DecomXsize, &DecomYsize, LinearOnly)) {
+	NumKernels = ReadReoderingFile(TextInput, &DecomX, &DecomY, &DecomXsize, &DecomYsize, LinearOnly, EnableBatch);
+	if(NumKernels<=0) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Pixel reodering file read failure", L"File incompatible", MB_OK);
 		return -4;
@@ -972,50 +1065,125 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 	}
 
 	int FrameSize = ImgHeader.Xsize * ImgHeader.Ysize;
-
-	// calculate decom address table
-	// A reordering list is made for an entire frame, so that it
-	// applying it is just a simple lookup table
 	DecomAddress = new int[(size_t)FrameSize];
-	if (DecomAddress==NULL) {
+	if (DecomAddress == NULL) {
 		delete[] DecomY;
 		delete[] DecomX;
 		delete[] InputImage;
 		MessageBox(hDlg, L"Decom address table allocation failure", L"File I/O", MB_OK);
 		return -1;
 	}
-	ComputeReordering(DecomAddress, ImgHeader.Xsize, ImgHeader.Ysize, DecomX, DecomY, DecomXsize, DecomYsize);
-	delete[] DecomY;
-	delete[] DecomX;
 
-	// write result to output file
-	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
-	if (!Out) {
-		delete[] InputImage;
-		delete[] DecomAddress;
-		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
-	}
+	int KernelOffset;
 
-	// write imgheader record out, no parameters in the header have changed
-	fwrite(&ImgHeader, sizeof(ImgHeader), 1, Out);
+	for (int Kernel = 0; Kernel < NumKernels; Kernel++) {
+		WCHAR BMPfilename[MAX_PATH];
+		WCHAR NewFilename[MAX_PATH];
 
-	for (i = 0; i < ImgHeader.NumFrames; i++) {
-		Offset = i * FrameSize;
-		for (int j = 0; j < FrameSize; j++) {
-			Pixel = InputImage[DecomAddress[j]+Offset];
-			if (ScalePixel && Pixel != 0) {
-				Pixel = 255;
+		// calculate decom address table
+		// A reordering list is made for an entire frame, so that it
+		// applying it is just a simple lookup table
+		KernelOffset = Kernel * DecomXsize * DecomYsize;
+
+		ComputeReordering(DecomAddress, ImgHeader.Xsize, ImgHeader.Ysize, DecomX + KernelOffset, DecomY + KernelOffset, DecomXsize, DecomYsize);
+		
+		if (EnableBatch) {
+			// for Batch processing, cutup filename, reassemble with index number (Kernel)
+			int err;
+			WCHAR Drive[_MAX_DRIVE];
+			WCHAR Dir[_MAX_DIR];
+			WCHAR Fname[_MAX_FNAME];
+			WCHAR Ext[_MAX_EXT];
+
+			// split apart original filename
+			err = _wsplitpath_s(OutputFile, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+				_MAX_FNAME, Ext, _MAX_EXT);
+			if (err != 0) {
+				delete[] DecomY;
+				delete[] DecomX;
+				delete[] InputImage;
+				delete[] DecomAddress;
+				MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+				return -2;
 			}
-			fwrite(&Pixel, 1, 1, Out);
+			// change the fname portion to add _kernel# 1 based
+			// use Kernel+1
+			WCHAR NewFname[_MAX_FNAME];
+
+			swprintf_s(NewFname, _MAX_FNAME, L"%s_%d", Fname, Kernel + 1);
+
+			// reassemble filename
+			err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, NewFname, Ext);
+			if (err != 0) {
+				delete[] DecomY;
+				delete[] DecomX;
+				delete[] InputImage;
+				delete[] DecomAddress;
+				MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+				return -2;
+			}
+			// create BMP of file
+			if (GenerateBMP) {
+				err = _wmakepath_s(BMPfilename, _MAX_PATH, Drive, Dir, NewFname, L".bmp");
+				if (err != 0) {
+					delete[] DecomY;
+					delete[] DecomX;
+					delete[] InputImage;
+					delete[] DecomAddress;
+					MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+					return -2;
+				}
+			}
+
+
+			// write result to output file
+			ErrNum = _wfopen_s(&Out, NewFilename, L"wb");
+			if (!Out) {
+				delete[] DecomY;
+				delete[] DecomX;
+				delete[] InputImage;
+				delete[] DecomAddress;
+				MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
+				return -2;
+			}
+		}
+		else {
+			// write result to output file
+			ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+			if (!Out) {
+				delete[] DecomY;
+				delete[] DecomX;
+				delete[] InputImage;
+				delete[] DecomAddress;
+				MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
+				return -2;
+			}
+		}
+
+		// write imgheader record out, no parameters in the header have changed
+		fwrite(&ImgHeader, sizeof(ImgHeader), 1, Out);
+
+		for (i = 0; i < ImgHeader.NumFrames; i++) {
+			Offset = i * FrameSize;
+			for (int j = 0; j < FrameSize; j++) {
+				Pixel = InputImage[DecomAddress[j] + Offset];
+				if (ScalePixel && Pixel != 0) {
+					Pixel = 255;
+				}
+				fwrite(&Pixel, 1, 1, Out);
+			}
+		}
+		fclose(Out);
+		if (GenerateBMP) {
+			SaveBMP(BMPfilename, NewFilename, FALSE, TRUE);
 		}
 	}
-	fclose(Out);
-
+	delete[] DecomY;
+	delete[] DecomX;
 	delete[] InputImage;
 	delete[] DecomAddress;
 
-	if (DisplayResults) {
+	if (DisplayResults && !EnableBatch) {
 		DisplayImage(OutputFile);
 	}
 
@@ -1034,9 +1202,11 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 //
 //*******************************************************************************
 int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
-						int* DecomXsize, int* DecomYsize, int LinearOnly)
+						int* DecomXsize, int* DecomYsize, int LinearOnly,
+						int EnableBatch)
 {
 	int iRes;
+	int iFormat;
 	FILE* TextIn;
 	errno_t ErrNum;
 	int* DecomX;
@@ -1051,9 +1221,12 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 	// first line in the reordering file determines
 	// the file format
 
-	iRes = fscanf_s(TextIn, "%d,%d,%d", DecomXsize, DecomYsize, &LinearFormat);
-	if (iRes != 2 && iRes!=3) {
+	iFormat = fscanf_s(TextIn, "%d,%d,%d", DecomXsize, DecomYsize, &LinearFormat);
+	if (iFormat != 2 && iFormat !=3) {
 		fclose(TextIn);
+		return -4;
+	}
+	if (((*DecomXsize) * (*DecomYsize)) <= 0) {
 		return -4;
 	}
 
@@ -1061,39 +1234,71 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 		return -4;
 	}
 
+	// scan file to determine number of kernels to process
+	int NumTotal = 0;
+	int NumKernels = 0;
+	if (!EnableBatch) {
+		NumKernels = 1;
+	}
+	else {
+		while (!feof(TextIn)) {
+			int x, y;
+			if (iFormat == 2) {
+				iRes = fscanf_s(TextIn, "%d,%d", &x, &y);
+				if (iRes != 2) break;
+			}
+			else {
+				iRes = fscanf_s(TextIn, "%d", &x);
+				if (iRes != 1) break;
+			}
+			NumTotal++;
+		}
+		NumKernels = NumTotal / ((*DecomXsize) * (*DecomYsize));
+		if (NumKernels == 0) {
+			fclose(TextIn);
+			return 0;
+		}
+
+		// reread start of file
+		fseek(TextIn, SEEK_SET, 0);
+		iFormat = fscanf_s(TextIn, "%d,%d,%d", DecomXsize, DecomYsize, &LinearFormat);
+	}
+
 	//
 	// read rest of reordering kernel
 	//
-	DecomX = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize)];
+	DecomX = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize)*(size_t)NumKernels];
 	if (DecomX == NULL) {
 		fclose(TextIn);
 		return -1;
 	}
-	DecomY = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize)];
+	DecomY = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize)*(size_t)NumKernels];
 	if (DecomY == NULL) {
 		delete[] DecomY;
 		fclose(TextIn);
 		return -1;
 	}
 
-	if (iRes == 2) {
-		for (int i = 0; i < ((*DecomXsize) * (*DecomYsize)); i++) {
+	if (iFormat == 2) {
+		for (int i = 0; i < ((*DecomXsize) * (*DecomYsize) * NumKernels); i++) {
 			iRes = fscanf_s(TextIn, "%d,%d", &DecomX[i], &DecomY[i]);
 			if (iRes != 2) {
 				delete[] DecomY;
 				delete[] DecomX;
+				fclose(TextIn);
 				return -4;
 			}
 		}
 	}
 	else {
 		// this is alternate formats (linear , 0 based or 1 based)
-		for (int i = 0; i < ((*DecomXsize) * (*DecomYsize)); i++) {
+		for (int i = 0; i < ((*DecomXsize) * (*DecomYsize) * NumKernels); i++) {
 			DecomY[i] = 0;
 			iRes = fscanf_s(TextIn, "%d", &DecomX[i]);
 			if (iRes != 1) {
 				delete[] DecomY;
 				delete[] DecomX;
+				fclose(TextIn);
 				return -4;
 			}
 			if (LinearFormat == 1) {
@@ -1101,19 +1306,23 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 				DecomX[i] = DecomX[i] - 1;
 			}
 			if (DecomX[i] < 0 || DecomX[i] >= ((*DecomXsize) * (*DecomYsize))) {
+				fclose(TextIn);
 				delete[] DecomY;
 				delete[] DecomX;
 				return -4;
 			}
 		}
 		//Convert format into relative pixel map
-		ConvertDecomList2Relative(DecomX, DecomY, *DecomXsize, *DecomYsize);
+		iRes = ConvertDecomList2Relative(DecomX, DecomY, *DecomXsize, *DecomYsize, NumKernels);
+		if (iRes != 1) {
+			// report error number
+			NumKernels = iRes;
+		}
 	}
 	fclose(TextIn);
-
 	*DecomXptr = DecomX;
 	*DecomYptr = DecomY;
-	return 1;
+	return NumKernels;
 }
 
 //******************************************************************************
@@ -1123,13 +1332,14 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 // private function for PixelReorder()
 //
 //*******************************************************************************
-int ConvertDecomList2Relative(int* DecomX, int *DecomY, int DecomXsize, int DecomYsize)
+int ConvertDecomList2Relative(int* DecomX, int *DecomY, int DecomXsize, int DecomYsize,
+								int NumKernels)
 {
-	int* NewDecomX = new int[(size_t)DecomXsize * (size_t)DecomYsize];
+	int* NewDecomX = new int[(size_t)DecomXsize * (size_t)DecomYsize * (size_t)NumKernels];
 	if (NewDecomX == NULL) {
 		return -1;
 	}
-	int* NewDecomY = new int[(size_t)DecomXsize * (size_t)DecomYsize];
+	int* NewDecomY = new int[(size_t)DecomXsize * (size_t)DecomYsize * (size_t)NumKernels];
 	if (NewDecomY == NULL) {
 		delete[] NewDecomX;
 		return -1;
@@ -1137,24 +1347,31 @@ int ConvertDecomList2Relative(int* DecomX, int *DecomY, int DecomXsize, int Deco
 
 	int Xpos, Ypos;
 	int Index;
+	int Offset;
 
-	for (int y = 0; y < DecomYsize; y++) {
-		for (int x = 0; x < DecomXsize; x++) {
-			if (DecomY[x + y * DecomXsize] != 0) {
-				// this function called with wrong decom table format
-				delete[] NewDecomX;
-				delete[] NewDecomY;
-				return 0;
+	for (int Kernel = 0; Kernel < NumKernels; Kernel++) {
+		Offset = Kernel * DecomXsize * DecomYsize;
+		for (int y = 0; y < DecomYsize; y++) {
+			for (int x = 0; x < DecomXsize; x++) {
+				Index = Offset + x + y * DecomXsize;
+				if (DecomY[Index] != 0) {
+					// this function called with wrong decom table format 1
+					// needs to be format 2 or 3
+					delete[] NewDecomX;
+					delete[] NewDecomY;
+					return 0;
+				}
+				// convert to new position relative to current position
+				Xpos = DecomX[Index] % DecomXsize;
+				Ypos = DecomX[Index] / DecomXsize;
+				NewDecomX[Index] = Xpos - x;
+				NewDecomY[Index] = Ypos - y;
 			}
-			// convert to new position reletive to current position
-			Index = x + y * DecomXsize;
-			Xpos = DecomX[Index] % DecomXsize;
-			Ypos = DecomX[Index] / DecomXsize;
-			NewDecomX[Index] = Xpos-x;
-			NewDecomY[Index] = Ypos-y;
 		}
+
 	}
-	for (int i = 0; i < DecomXsize * DecomYsize; i++) {
+
+	for (int i = 0; i < DecomXsize * DecomYsize * NumKernels; i++) {
 		DecomX[i] = NewDecomX[i];
 		DecomY[i] = NewDecomY[i];
 	}

@@ -38,6 +38,7 @@
 #define IDD_IMGTOOLS_ROTATE             155
 #define IDD_IMGTOOLS_DECIMATION         156
 #define IDD_IMGTOOLS_RESIZE             157
+#define IDD_BITTOOLS_TEXT2STREAM        158
 #define IDC_CONVERT                     1000
 #define IDC_ABOUT_AUTHOR                1001
 #define IDC_XSIZE                       1001
@@ -98,8 +99,13 @@
 #define IDC_INPUT_BROWSE                1036
 #define IDC_TEXT_OUTPUT_BROWSE          1037
 #define IDC_IMAGE_INPUT_BROWSE2         1038
+#define IDC_BINARY_OUTPUT               1038
 #define IDC_BITORDER                    1039
+#define IDC_OUTPUT_BROWSE               1039
 #define IDC_SCALE_PIXEL                 1040
+#define IDC_DISABLE                     1041
+#define IDC_GENERATE_BMP                1041
+#define IDC_BATCH                       1042
 #define IDC_REORDER                     1074
 #define IDC_IMAGE_INPUT_BROWSE          1077
 #define IDC_IMAGE_INPUT                 1078
@@ -153,6 +159,14 @@
 #define ID_IMAGETOOLS_RESIZEIMAGE       32851
 #define ID_IMAGETOOLS_RESIZE            32852
 #define IDM_IMAGETOOLS_RESIZE           32853
+#define ID_BITTOOLS_VITERBIENCODER      32854
+#define ID_BITTOOLS_VITERBIDECODER      32855
+#define ID_BITTOOLS_ENCODE              32856
+#define IDM_BITTOOLS_ENCODE             32857
+#define IDM_BITTOOLS_DECODER            32858
+#define ID_BITTOOLS_TEXTBITSTREAMTOPACKEDBITSTREAM 32859
+#define ID_BITTOOLS_TEXT2BITSTREAM      32860
+#define IDM_BITTOOLS_TEXT2BITSTREAM     32861
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -161,8 +175,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        138
-#define _APS_NEXT_COMMAND_VALUE         32854
-#define _APS_NEXT_CONTROL_VALUE         1035
+#define _APS_NEXT_COMMAND_VALUE         32862
+#define _APS_NEXT_CONTROL_VALUE         1040
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

@@ -61,6 +61,15 @@
 //                      Added Image Decimation
 //                      Added Resize image file
 //                      Interim display solution using external viewer
+// V1.2.0.1 2023-08-31  Added Convert text to packed bitstream file
+//                      Added image stats reporting not just image header stats
+//                      Corrected error handling of reorder list, when entry in
+//                      kernel is out of bounds, file closure on error.
+//                      Use of Windows default viewer for BMP display works adequately.
+//                      Clean up of ImageDlg to just rely on external viewer.
+//                      Added batch processing for reordering,  This allows a series of
+//                      reorder kernels to be used.  Each kernel adds an index number
+//                      onto the output filename.
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -154,6 +163,7 @@ INT_PTR CALLBACK    DecimationDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ResizeDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    GlobalSettingsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ImageDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    Text2StreamDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -374,6 +384,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_EXTRACT), hWnd, BitExtractDlg);
                 break;
 
+            case IDM_BITTOOLS_TEXT2BITSTREAM:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_TEXT2STREAM), hWnd, Text2StreamDlg);
+                break;
+
             case IDM_BITTOOLS_BITDISTANCES:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_DISTANCES), hWnd, BitDistancesDlg);
                 break;
@@ -410,7 +424,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     wcscpy_s(szCurrentFilename, pszFilename);
                     CoTaskMemFree(pszFilename);
 
-                    ReportImageHeader(hWnd, szCurrentFilename);
+                    ReportImageProperties(hWnd, szCurrentFilename);
                 }
                 break;
             }

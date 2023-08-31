@@ -19,10 +19,15 @@
 // This file contains the dialog callback procedures for the image tools menu
 // 
 // V1.0.0.1 2023-08-20  Initial Release
-// V1.1.0.1 2023-08-22, Added file type specifications to open/save dialogs
+// V1.1.0.1 2023-08-22  Added file type specifications to open/save dialogs
 //                      Added Image Decimation
 //                      Added Resize image file
 //                      Interim display solution using external viewer
+// V1.2.0.1 2023-08-31  Use of Windows default viewer for BMP display works adequately.
+//                      Clean up of ImageDlg to just rely on external viewer.
+//                      Added batch processing for reordering,  This allows a series of
+//                      reorder kernels to be used.  Each kernel adds an index number
+//                      onto the output filename.
 //
 // Imaging tools dialog box handlers
 // 
@@ -59,9 +64,6 @@
 //*******************************************************************************
 INT_PTR CALLBACK ImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    // need to add paint, resize messages, etc to load/refresh image
-    static HBITMAP ImageBMP = NULL;
-
 //    UNREFERENCED_PARAMETER(lParam);
     switch (message)
     {
@@ -93,34 +95,22 @@ INT_PTR CALLBACK ImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         RECT rc;
         HDC hDC;
         if (GetUpdateRect(hDlg, &rc, 0)) {
-            if (ImageBMP != NULL) {
-                DeleteObject(ImageBMP);
-            }
-            // this doesn't work for most BMP files, only certain formats are allowed
-            // need to find a different method.
-            //ImageBMP = (HBITMAP)LoadImage(hInst, (LPCWSTR)szBMPFilename, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-            // temporary solution using external viewer
             hDC = BeginPaint(hDlg, &ps);
             if (hDC == NULL) {
                 break;
             }
+            TextOut(hDC,40,20, szBMPFilename, (int) wcslen(szBMPFilename));
+            TextOut(hDC, 40, 40, L"using external BMP viewer", 25);
+            EndPaint(hDlg, &ps);
 
             // Initialize COM
             HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
+            // use the default Windows viewer for BMP file
             ShellExecute(hDlg, 0, szBMPFilename, 0, 0, SW_NORMAL);
 
             // release COM
             CoUninitialize();
-
-            TextOut(hDC,40,20, szBMPFilename, (int) wcslen(szBMPFilename));
-            if (ImageBMP == NULL) {
-                // redraw image, newer method need to be used
-                TextOut(hDC, 40, 40, L"Temporay solution", 17);
-                TextOut(hDC, 40, 60, L"using external BMP viewer", 25);
-            }
-            // older methods deleted, needs updating
-            EndPaint(hDlg, &ps);
         }
         break;
     }
@@ -130,9 +120,6 @@ INT_PTR CALLBACK ImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         // save window position/size data
         CString csString = L"ImageWindow";
         SaveWindowPlacement(hDlg, csString);
-        if (ImageBMP != NULL) {
-            DeleteObject(ImageBMP);
-        }
         break;
     }
 
@@ -733,6 +720,8 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
     case WM_INITDIALOG: 
     {
         int ScalePixel;
+        int EnableBatch;
+        int GenerateBMP;
         IMAGINGHEADER ImageHeader;
 
         GetPrivateProfileString(L"ReorderImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -761,6 +750,26 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         else {
             CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_CHECKED);
         }
+
+        EnableBatch = GetPrivateProfileInt(L"ReorderImageDlg", L"EnableBatch", 0, (LPCTSTR)strAppNameINI);
+        if (!EnableBatch) {
+            CheckDlgButton(hDlg, IDC_BATCH, BST_UNCHECKED);
+            HWND GenarateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+            EnableWindow(GenarateHandle, FALSE);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_BATCH, BST_CHECKED);
+            GenerateBMP = GetPrivateProfileInt(L"ReorderImageDlg", L"GenerateBMP", 0, (LPCTSTR)strAppNameINI);
+            HWND GenarateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+            EnableWindow(GenarateHandle, TRUE);
+            if (!GenerateBMP) {
+                CheckDlgButton(hDlg, IDC_GENERATE_BMP, BST_UNCHECKED);
+            }
+            else {
+                CheckDlgButton(hDlg, IDC_GENERATE_BMP, BST_CHECKED);
+            }
+        }
+
         return (INT_PTR)TRUE;
     }
 
@@ -841,12 +850,25 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             return (INT_PTR)TRUE;
         }
 
+        case IDC_BATCH:
+            if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
+                HWND GenerateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+                EnableWindow(GenerateHandle, TRUE);
+            }
+            else {
+                HWND GenerateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+                EnableWindow(GenerateHandle, FALSE);
+            }
+            return (INT_PTR)TRUE;
+
         case IDC_REORDER:
         {
             WCHAR InputFile[MAX_PATH];
             WCHAR TextInput[MAX_PATH];
             WCHAR OutputFile[MAX_PATH];
             int ScalePixel = 0;
+            int GenerateBMP = 0;
+            int EnableBatch = 0;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextInput, MAX_PATH);
@@ -854,8 +876,14 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
                 ScalePixel = 1;
             }
+            if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
+                EnableBatch = 1;
+                if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
+                    GenerateBMP = 1;
+                }
+            }
 
-            PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, FALSE);
+            PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, FALSE, EnableBatch, GenerateBMP);
 
             return (INT_PTR)TRUE;
         }
@@ -874,6 +902,19 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
                 WritePrivateProfileString(L"ReorderImageDlg", L"ScalePixel", L"1", (LPCTSTR)strAppNameINI);
             } else {
                 WritePrivateProfileString(L"ReorderImageDlg", L"ScalePixel", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
+                WritePrivateProfileString(L"ReorderImageDlg", L"EnableBatch", L"1", (LPCTSTR)strAppNameINI);
+                if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
+                    WritePrivateProfileString(L"ReorderImageDlg", L"GenerateBMP", L"1", (LPCTSTR)strAppNameINI);
+                }
+                else {
+                    WritePrivateProfileString(L"ReorderImageDlg", L"GenerateBMP", L"0", (LPCTSTR)strAppNameINI);
+                }
+            }
+            else {
+                WritePrivateProfileString(L"ReorderImageDlg", L"EnableBatch", L"0", (LPCTSTR)strAppNameINI);
             }
 
             EndDialog(hDlg, LOWORD(wParam));

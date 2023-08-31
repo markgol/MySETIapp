@@ -24,4 +24,4 @@ void BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
     int BitDepth, int BitOrder, int BitScale);
 
-
+int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile);

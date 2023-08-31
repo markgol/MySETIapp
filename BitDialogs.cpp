@@ -21,7 +21,8 @@
 // This file contains the dialog callback procedures for the bit tools menu
 // 
 // V1.0.0.1 2023-08-20  Initial Release
-// V1.1.0.1 2023-08-22, Added file type specifications to open/save dialogs
+// V1.1.0.1 2023-08-22  Added file type specifications to open/save dialogs
+// V1.2.0.1 2023-08-31  Added text to packed bit stream file
 //
 // Bit tools dialog box handlers
 // 
@@ -899,7 +900,7 @@ INT_PTR CALLBACK BitReorderDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
                 ScalePixel = 1;
             }
 
-            PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, TRUE);
+            PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, TRUE, FALSE, FALSE);
 
             return (INT_PTR)TRUE;
         }
@@ -1118,6 +1119,103 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             else {
                 WritePrivateProfileString(L"BitImageDlg", L"BitScale", L"0", (LPCTSTR)strAppNameINI);
             }
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
+// Message handler for Text2StreamDlg dialog box.
+// 
+// This converts a text file into a binary bitstream file (like data17.bin)
+// 
+//*******************************************************************************
+INT_PTR CALLBACK Text2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+        GetPrivateProfileString(L"Text2StreamDlg", L"TextInput", L"Data\\data17.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+
+        GetPrivateProfileString(L"Text2StreamDlg", L"BinaryOutput", L"Data\\bitstream.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString);
+
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC bitType[] =
+            {
+                 { L"bit stream files", L"*.bin" },
+                 { L"All Files", L"*.*" },
+            };
+
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, bitType, L".bin")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+        case IDC_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"text stream files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, textType, L"*.txt")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_CONVERT:
+        {
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, OutputFile, MAX_PATH);
+
+            ConvertText2BitStream(hDlg, InputFile, OutputFile);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"Text2StreamDlg", L"TextInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"Text2StreamDlg", L"BinaryOutput", szString, (LPCTSTR)strAppNameINI);
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
