@@ -23,6 +23,7 @@
 // V1.0.0.1 2023-08-20  Initial Release
 // V1.1.0.1 2023-08-22  Added file type specifications to open/save dialogs
 // V1.2.0.1 2023-08-31  Added text to packed bit stream file
+// V1.2.2.1 2023-09-06  Changed default folders\filenames
 //
 // Bit tools dialog box handlers
 // 
@@ -62,10 +63,10 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
-        GetPrivateProfileString(L"BitHexDumpDlg", L"BinaryInput", L"Data\\OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitHexDumpDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
-        GetPrivateProfileString(L"BitHexDumpDlg", L"TextOutput", L"Data\\data17-hex.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitHexDumpDlg", L"TextOutput", L"data17-hex.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
         GetPrivateProfileString(L"BitHexDumpDlg", L"xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -171,10 +172,10 @@ INT_PTR CALLBACK BitTextStreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
-        GetPrivateProfileString(L"BitTextStreamDlg", L"BinaryInput", L"Data\\OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitTextStreamDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
-        GetPrivateProfileString(L"BitTextStreamDlg", L"TextOutput", L"Data\\data17.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitTextStreamDlg", L"TextOutput", L"data17.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
         GetPrivateProfileString(L"BitTextStreamDlg", L"PrologueSize", L"80", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -313,10 +314,10 @@ INT_PTR CALLBACK BitExtractDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
-        GetPrivateProfileString(L"BitExtractDlg", L"BinaryInput", L"Data\\OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitExtractDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
-        GetPrivateProfileString(L"BitExtractDlg", L"TextOutput", L"Data\\extracted.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitExtractDlg", L"TextOutput", L"extracted.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
         GetPrivateProfileString(L"BitExtractDlg", L"SkipBits", L"80", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -434,10 +435,10 @@ INT_PTR CALLBACK BitDistancesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
-        GetPrivateProfileString(L"BitDistancesDlg", L"BinaryInput", L"Data\\OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitDistancesDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
-        GetPrivateProfileString(L"BitDistancesDlg", L"TextOutput", L"Data\\data17-bit-distances.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitDistancesDlg", L"TextOutput", L"data17-bit-distances.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
         GetPrivateProfileString(L"BitDistancesDlg", L"PrologueSize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -536,10 +537,10 @@ INT_PTR CALLBACK BitSequencesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
-        GetPrivateProfileString(L"BitSequencesDlg", L"BinaryInput", L"Data\\OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitSequencesDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
-        GetPrivateProfileString(L"BitSequencesDlg", L"TextOutput", L"Data\\data17-bit-sequences.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitSequencesDlg", L"TextOutput", L"data17-bit-sequences.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
         GetPrivateProfileString(L"BitSequencesDlg", L"PrologueSize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -638,10 +639,10 @@ INT_PTR CALLBACK BitStatsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
-        GetPrivateProfileString(L"BitStatsDlg", L"BinaryInput", L"Data\\OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitStatsDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
-        GetPrivateProfileString(L"BitStatsDlg", L"TextOutput", L"Data\\data17-stats.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitStatsDlg", L"TextOutput", L"data17-stats.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
         GetPrivateProfileString(L"BitStatsDlg", L"PrologueSize", L"80", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -774,7 +775,7 @@ INT_PTR CALLBACK BitReorderDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         int ScalePixel;
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"BitReorderDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitReorderDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
 
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
@@ -788,10 +789,10 @@ INT_PTR CALLBACK BitReorderDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"BitReorderDlg", L"TextInput", L"Data\\Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitReorderDlg", L"TextInput", L"Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
 
-        GetPrivateProfileString(L"BitReorderDlg", L"ImageOutput", L"Data\\Reordered.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitReorderDlg", L"ImageOutput", L"Reordered.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         ScalePixel = GetPrivateProfileInt(L"BitReorderDlg", L"ScalePixel", 0, (LPCTSTR)strAppNameINI);
@@ -950,10 +951,10 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
         int BitOrder;
         int BitScale;
 
-        GetPrivateProfileString(L"BitImageDlg", L"BinaryInput", L"Data\\OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitImageDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
-        GetPrivateProfileString(L"BitImageDlg", L"ImageOutput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"BitImageDlg", L"ImageOutput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"BitImageDlg", L"PrologueSize", L"80", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1146,10 +1147,10 @@ INT_PTR CALLBACK Text2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
-        GetPrivateProfileString(L"Text2StreamDlg", L"TextInput", L"Data\\data17.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"Text2StreamDlg", L"TextInput", L"data17.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
 
-        GetPrivateProfileString(L"Text2StreamDlg", L"BinaryOutput", L"Data\\bitstream.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"Text2StreamDlg", L"BinaryOutput", L"bitstream.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString);
 
         return (INT_PTR)TRUE;

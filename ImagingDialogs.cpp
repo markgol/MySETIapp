@@ -29,6 +29,7 @@
 //                      reorder kernels to be used.  Each kernel adds an index number
 //                      onto the output filename.
 // V1.2.1.1 2023-09-06  Corrected ImageDlg to display results file only once.
+// V1.2.2.1 2023-09-06  Changed default folders\filenames
 //
 // Imaging tools dialog box handlers
 // 
@@ -150,7 +151,7 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 
     case WM_INITDIALOG:
         IMAGINGHEADER ImageHeader;
-        GetPrivateProfileString(L"ExtractImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ExtractImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
 
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
@@ -164,7 +165,7 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"ExtractImageDlg", L"ImageOutput", L"Data\\Extracted.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ExtractImageDlg", L"ImageOutput", L"Extracted.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"ExtractImageDlg", L"xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -386,7 +387,7 @@ INT_PTR CALLBACK AppendEndImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -399,10 +400,10 @@ INT_PTR CALLBACK AppendEndImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageInput2", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageInput2", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString);
 
-        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageOutput", L"Data\\AppendedEnd.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendEndImageDlg", L"ImageOutput", L"AppendedEnd.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
         {
             int IncrFrames;
@@ -568,7 +569,7 @@ INT_PTR CALLBACK AppendRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -581,10 +582,10 @@ INT_PTR CALLBACK AppendRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageInput2", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageInput2", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString);
 
-        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageOutput", L"Data\\AppendedRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AppendRightImageDlg", L"ImageOutput", L"AppendedRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         return (INT_PTR)TRUE;
@@ -733,7 +734,7 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         int GenerateBMP;
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"ReorderImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ReorderImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -746,10 +747,10 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"ReorderImageDlg", L"TextInput", L"Data\\Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ReorderImageDlg", L"TextInput", L"Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
 
-        GetPrivateProfileString(L"ReorderImageDlg", L"ImageOutput", L"Data\\Reordered.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ReorderImageDlg", L"ImageOutput", L"Reordered.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         ScalePixel = GetPrivateProfileInt(L"ReorderImageDlg", L"ScalePixel", 0, (LPCTSTR)strAppNameINI);
@@ -953,7 +954,7 @@ INT_PTR CALLBACK FoldLeftImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"FoldLeftImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldLeftImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -966,7 +967,7 @@ INT_PTR CALLBACK FoldLeftImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"FoldLeftImageDlg", L"ImageOutput", L"Data\\FoldLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldLeftImageDlg", L"ImageOutput", L"FoldLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"FoldLeftImageDlg", L"FoldColumn", L"128", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1085,7 +1086,7 @@ INT_PTR CALLBACK FoldRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"FoldRightImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldRightImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1098,7 +1099,7 @@ INT_PTR CALLBACK FoldRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"FoldRightImageDlg", L"ImageOutput", L"Data\\FoldRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldRightImageDlg", L"ImageOutput", L"FoldRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"FoldRightImageDlg", L"FoldColumn", L"128", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1217,7 +1218,7 @@ INT_PTR CALLBACK FoldDownImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"FoldDownImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldDownImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1230,7 +1231,7 @@ INT_PTR CALLBACK FoldDownImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"FoldDownImageDlg", L"ImageOutput", L"Data\\FoldDown.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldDownImageDlg", L"ImageOutput", L"FoldDown.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"FoldDownImageDlg", L"FoldRow", L"128", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1349,7 +1350,7 @@ INT_PTR CALLBACK FoldUpImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"FoldUpImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldUpImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1362,7 +1363,7 @@ INT_PTR CALLBACK FoldUpImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"FoldUpImageDlg", L"ImageOutput", L"Data\\FoldUp.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"FoldUpImageDlg", L"ImageOutput", L"FoldUp.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"FoldUpImageDlg", L"FoldRow", L"128", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1481,7 +1482,7 @@ INT_PTR CALLBACK LeftAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"LeftAccordionImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"LeftAccordionImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1494,7 +1495,7 @@ INT_PTR CALLBACK LeftAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"LeftAccordionImageDlg", L"ImageOutput", L"Data\\AccordionLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"LeftAccordionImageDlg", L"ImageOutput", L"AccordionLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"LeftAccordionImageDlg", L"AccordionSize", L"16", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1612,7 +1613,7 @@ INT_PTR CALLBACK RightAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, 
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"RightAccordionImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"RightAccordionImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1625,7 +1626,7 @@ INT_PTR CALLBACK RightAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, 
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"RightAccordionImageDlg", L"ImageOutput", L"Data\\AccordionRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"RightAccordionImageDlg", L"ImageOutput", L"AccordionRight.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetPrivateProfileString(L"RightAccordionImageDlg", L"AccordionSize", L"16", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -1743,7 +1744,7 @@ INT_PTR CALLBACK LeftShiftRowsImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"LeftShiftRowsImageDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"LeftShiftRowsImageDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1756,7 +1757,7 @@ INT_PTR CALLBACK LeftShiftRowsImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"LeftShiftRowsImageDlg", L"ImageOutput", L"Data\\ShiftLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"LeftShiftRowsImageDlg", L"ImageOutput", L"ShiftLeft.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         return (INT_PTR)TRUE;
@@ -1866,7 +1867,7 @@ INT_PTR CALLBACK ConvolutionImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"ConvolutionImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ConvolutionImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -1879,10 +1880,10 @@ INT_PTR CALLBACK ConvolutionImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"ConvolutionImageDlg", L"TextInput", L"Data\\Convolution\\Kernel.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ConvolutionImageDlg", L"TextInput", L"Convolution\\Kernel.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
 
-        GetPrivateProfileString(L"ConvolutionImageDlg", L"ImageOutput", L"Data\\Convolved.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ConvolutionImageDlg", L"ImageOutput", L"Convolved.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         return (INT_PTR)TRUE;
@@ -2018,7 +2019,7 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"AddImagesImageDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AddImagesImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -2031,7 +2032,7 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"AddImagesImageDlg", L"ImageInput2", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"AddImagesImageDlg", L"ImageInput2", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT2, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI2, ImageHeader.Xsize, TRUE);
@@ -2198,7 +2199,7 @@ INT_PTR CALLBACK MirrorDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"MirrorDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"MirrorDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -2211,7 +2212,7 @@ INT_PTR CALLBACK MirrorDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"MirrorDlg", L"ImageOutput", L"Data\\Mirrored.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"MirrorDlg", L"ImageOutput", L"Mirrored.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         int Direction = GetPrivateProfileInt(L"MirrorDlg", L"Direction", 0, (LPCTSTR)strAppNameINI);
@@ -2342,7 +2343,7 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"RotateDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"RotateDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -2355,7 +2356,7 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"RotateDlg", L"ImageOutput", L"Data\\Rotated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"RotateDlg", L"ImageOutput", L"Rotated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         int Direction = GetPrivateProfileInt(L"RotateDlg", L"Direction", 0, (LPCTSTR)strAppNameINI);
@@ -2487,7 +2488,7 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
     {
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"ResizeDlg", L"ImageInput", L"Data\\message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ResizeDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -2502,7 +2503,7 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"ResizeDlg", L"ImageOutput", L"Data\\Resized.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ResizeDlg", L"ImageOutput", L"Resized.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         GetDlgItemText(hDlg, IDC_XSIZEI, szString, MAX_PATH);
@@ -2657,7 +2658,7 @@ INT_PTR CALLBACK DecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         int ScalePixel;
         IMAGINGHEADER ImageHeader;
 
-        GetPrivateProfileString(L"DecimationDlg", L"ImageInput", L"Data\\Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"DecimationDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
         if (ReadImageHeader(szString, &ImageHeader) == 1) {
             SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
@@ -2670,10 +2671,10 @@ INT_PTR CALLBACK DecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
         }
 
-        GetPrivateProfileString(L"DecimationDlg", L"TextInput", L"Data\\Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"DecimationDlg", L"TextInput", L"Decimation\\Decimation.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
 
-        GetPrivateProfileString(L"DecimationDlg", L"ImageOutput", L"Data\\Decimated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"DecimationDlg", L"ImageOutput", L"Decimated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
         ScalePixel = GetPrivateProfileInt(L"DecimationDlg", L"ScalePixel", 0, (LPCTSTR)strAppNameINI);

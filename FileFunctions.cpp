@@ -47,6 +47,9 @@
 // V1.2.1.1 2023-09-06  Added ImportBMP
 //                      Added Hex2Binary
 //                      Corrected ImageDlg to display results file only once.
+// V1.2.2.1 2023-09-06  Path must exist check is done on selected files in dialogs.
+//                      Corrected bug introduced in V1.2.1 where incorrect frame size
+//                      was used in the ImportBMP function.
 //
 #include "framework.h"
 #include "resource.h"
@@ -103,7 +106,7 @@ if (SUCCEEDED(hr))
     if (SUCCEEDED(hr))
     {
         if (!bSelectFolder) {
-            hr = pFileOpen->SetOptions(FOS_FORCEFILESYSTEM);
+            hr = pFileOpen->SetOptions(FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST);
             if (NumTypes != 0 && FileTypes!=NULL) {
                 hr = pFileOpen->SetFileTypes(NumTypes, FileTypes);
             }
@@ -111,7 +114,7 @@ if (SUCCEEDED(hr))
                 hr = pFileOpen->SetDefaultExtension(szDefExt);
             }
         } else {
-            hr = pFileOpen->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM); // This selects only a folder, not a filename
+            hr = pFileOpen->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST); // This selects only a folder, not a filename
         }
         
         if (wcscmp(pszCurrentFilename, L"") != 0)
@@ -195,7 +198,7 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
         if (SUCCEEDED(hr))
         {
             if (!bSelectFolder) {
-                hr = pFileSave->SetOptions(FOS_FORCEFILESYSTEM | FOS_OVERWRITEPROMPT);
+                hr = pFileSave->SetOptions(FOS_FORCEFILESYSTEM | FOS_OVERWRITEPROMPT || FOS_PATHMUSTEXIST);
                 if (NumTypes != 0 && FileTypes != NULL) {
                     hr = pFileSave->SetFileTypes(NumTypes, FileTypes);
                 }
@@ -203,7 +206,7 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
                     hr = pFileSave->SetDefaultExtension(szDefExt);
                 }
             } else {
-                hr = pFileSave->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM); // This selects only a folder, not a filename
+                hr = pFileSave->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST); // This selects only a folder, not a filename
             }
             
             if (wcscmp(pszCurrentFilename, L"") != 0)
@@ -1355,6 +1358,8 @@ int ImportBMP(HWND hWnd)
         return -1;
     }
 
+    int NumFrames = 1;
+
     if (BMPinfoheader.biBitCount == 1) {
         // This is bit image, has color table, 2 entries
         // Skip the 2 RGBQUAD entries
@@ -1466,6 +1471,7 @@ int ImportBMP(HWND hWnd)
     else {
         // this is a 24 bit, RGB image
         // The color table is biClrUsed long
+        NumFrames = 3;
         if (BMPinfoheader.biClrUsed != 0) {
             // skip the color table if present
             if (fseek(BMPfile, sizeof(RGBQUAD) * BMPinfoheader.biClrUsed, SEEK_CUR) != 0) {
@@ -1521,7 +1527,7 @@ int ImportBMP(HWND hWnd)
     ImgHeader.HeaderSize = (short)sizeof(IMAGINGHEADER);
     ImgHeader.ID = (short)0xaaaa;
     ImgHeader.Version = (short)1;
-    ImgHeader.NumFrames = (short)3;
+    ImgHeader.NumFrames = (short)NumFrames;
     ImgHeader.PixelSize = (short)1;
     ImgHeader.Xsize = BMPinfoheader.biWidth;
     ImgHeader.Ysize = BMPinfoheader.biHeight;
@@ -1542,7 +1548,7 @@ int ImportBMP(HWND hWnd)
     BYTE Pixel;
     fwrite(&ImgHeader, sizeof(IMAGINGHEADER), 1, ImgFile);
 
-    for (int i = 0; i < (ImgHeader.Xsize*ImgHeader.Ysize * 3) ; i++) {
+    for (int i = 0; i < (ImgHeader.Xsize*ImgHeader.Ysize * NumFrames) ; i++) {
         if (Image[i] <= 0) {
             Pixel = 0;
         }

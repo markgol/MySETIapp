@@ -20,6 +20,9 @@
 // 
 // V1.0.0.1 2023-08-20  Initial Release
 // V1.1.0.1 2023-08-22, Added file type specifications to open/save dialogs
+// V1.2.2.1 2023-09-10  Changed default folders\filenames
+//                      Changed default settings for app -> display last results, autoscale, RGB display for 3 frame files
+//                      Removed Autosize flag from settings.
 //
 // Global Settings dialog box handler
 // 
@@ -50,31 +53,25 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
     case WM_INITDIALOG:
     {
         int iRes;
-        GetPrivateProfileString(L"GlobalSettings", L"BMPresults", szBMPFilename, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"GlobalSettings", L"BMPresults", L"BMP files\\last.bmp", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BMP_RESULTS, szString);
 
         //IDC_SETTINGS_DISPLAY_RESULTS
-        iRes = GetPrivateProfileInt(L"GlobalSettings", L"DisplayResults", 0, (LPCTSTR)strAppNameINI);
+        iRes = GetPrivateProfileInt(L"GlobalSettings", L"DisplayResults", 1, (LPCTSTR)strAppNameINI);
         if (iRes != 0) {
             CheckDlgButton(hDlg, IDC_SETTINGS_DISPLAY_RESULTS, BST_CHECKED);
         }
 
         // IDC_SETTINGS_AUTOSCALE_RESULTS
-        iRes = GetPrivateProfileInt(L"GlobalSettings", L"AutoScaleResults", 0, (LPCTSTR)strAppNameINI);
+        iRes = GetPrivateProfileInt(L"GlobalSettings", L"AutoScaleResults", 1, (LPCTSTR)strAppNameINI);
         if (iRes != 0) {
             CheckDlgButton(hDlg, IDC_SETTINGS_AUTOSCALE_RESULTS, BST_CHECKED);
         }
 
         // IDC_SETTINGS_RGB_DISPLAY
-        iRes = GetPrivateProfileInt(L"GlobalSettings", L"DefaultRBG", 0, (LPCTSTR)strAppNameINI);
+        iRes = GetPrivateProfileInt(L"GlobalSettings", L"DefaultRBG", 1, (LPCTSTR)strAppNameINI);
         if (iRes != 0) {
             CheckDlgButton(hDlg, IDC_SETTINGS_RGB_DISPLAY, BST_CHECKED);
-        }
-
-        // IDC_SETTINGS_AUTOSIZE
-        iRes = GetPrivateProfileInt(L"GlobalSettings", L"AutoSize", 0, (LPCTSTR)strAppNameINI);
-        if (iRes != 0) {
-            CheckDlgButton(hDlg, IDC_SETTINGS_AUTOSIZE, BST_CHECKED);
         }
 
         return (INT_PTR)TRUE;
@@ -136,16 +133,6 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             else {
                 WritePrivateProfileString(L"GlobalSettings", L"DefaultRBG", L"0", (LPCTSTR)strAppNameINI);
                 DefaultRBG = 0;
-            }
-
-            // IDC_SETTINGS_AUTOSIZE
-            if (IsDlgButtonChecked(hDlg, IDC_SETTINGS_AUTOSIZE) == BST_CHECKED) {
-                WritePrivateProfileString(L"GlobalSettings", L"AutoSize", L"1", (LPCTSTR)strAppNameINI);
-                AutoSize = 1;
-            }
-            else {
-                WritePrivateProfileString(L"GlobalSettings", L"AutoSize", L"0", (LPCTSTR)strAppNameINI);
-                AutoSize = 0;
             }
 
             EndDialog(hDlg, LOWORD(wParam));

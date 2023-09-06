@@ -73,6 +73,12 @@
 // V1.2.1.1 2023-09-06  Added import BMP to image file (.raw). Must be 1 bit, 8 bit, or 24 bit
 //                      Added HEX text file to binary file
 //                      Corrected ImageDlg to display results file only once.
+// V1.2.2.1 2023-09-06  Path must exist check is done on selected files in dialogs.
+//                      Changed default folders\filenames
+//                      Changed default settings for app -> display last results, autoscale, RGB display for 3 frame files
+//                      Removed Autosize flag from settings.
+//                      Corrected bug introduced in V1.2.1 where incorrect frame size
+//                      was used in the ImportBMP function.
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
