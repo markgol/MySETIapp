@@ -103,7 +103,6 @@
 #define IDC_BITORDER                    1039
 #define IDC_OUTPUT_BROWSE               1039
 #define IDC_SCALE_PIXEL                 1040
-#define IDC_DISABLE                     1041
 #define IDC_GENERATE_BMP                1041
 #define IDC_BATCH                       1042
 #define IDC_REORDER                     1074
@@ -167,6 +166,11 @@
 #define ID_BITTOOLS_TEXTBITSTREAMTOPACKEDBITSTREAM 32859
 #define ID_BITTOOLS_TEXT2BITSTREAM      32860
 #define IDM_BITTOOLS_TEXT2BITSTREAM     32861
+#define ID_FILE_IMPORTBMPFILE           32862
+#define IDM_FILE_IMPORT_BMP             32863
+#define IDM_IMPORT_BMP                  32864
+#define ID_FILE_HEXFILETOBINARYFILE     32865
+#define IDM_FILE_HEX2BINARY             32866
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -175,7 +179,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        138
-#define _APS_NEXT_COMMAND_VALUE         32862
+#define _APS_NEXT_COMMAND_VALUE         32867
 #define _APS_NEXT_CONTROL_VALUE         1040
 #define _APS_NEXT_SYMED_VALUE           110
 #endif

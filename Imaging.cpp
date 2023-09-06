@@ -41,6 +41,7 @@
 //                      Added batch processing for reordering,  This allows a series of
 //                      reorder kernels to be used.  Each kernel adds an index number
 //                      onto the output filename.
+// V1.2.1.1 2023-09-06	Decimation process, corrected incorrect calculation for new Y dimension
 //
 #include "framework.h"
 #include "stdio.h"
@@ -209,7 +210,7 @@ void ReportImageHeader(HWND hDlg, WCHAR* Filename)
 	size_t iRead;
 
 	ErrNum = _wfopen_s(&In, Filename, L"rb");
-	if (In==NULL) {
+	if (In == NULL) {
 		MessageBox(hDlg, L"Could not open file", L"File I/O", MB_OK);
 		return;
 	}
@@ -236,9 +237,9 @@ void ReportImageHeader(HWND hDlg, WCHAR* Filename)
 		return;
 	}
 
-	if (ImageHeader.PixelSize != 1 && ImageHeader.PixelSize!=2 && ImageHeader.PixelSize!=4) {
+	if (ImageHeader.PixelSize != 1 && ImageHeader.PixelSize != 2 && ImageHeader.PixelSize != 4) {
 		MessageBox(hDlg, L"File is not a pixel image file", L"File I/O", MB_OK);
-			return;
+		return;
 	}
 
 	// report contents of image header
@@ -272,7 +273,8 @@ void ReportImageProperties(HWND hDlg, WCHAR* Filename)
 		if (iRes == -2) {
 			//     -2 open file failure
 			MessageBox(hDlg, L"Could not open file", L"File error", MB_OK);
-		} else if (iRes == -3) {
+		}
+		else if (iRes == -3) {
 			//     -3 file read failure
 			MessageBox(hDlg, L"Read failure of file", L"File error", MB_OK);
 		}
@@ -304,7 +306,7 @@ void ReportImageProperties(HWND hDlg, WCHAR* Filename)
 		MessageBox(hDlg, L"File is not a pixel image file", L"File I/O", MB_OK);
 		return;
 	}
-	int NonZeroPixels=0;
+	int NonZeroPixels = 0;
 	int ImageMin = InputImage[0];
 	int ImageMax = InputImage[0];
 	for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize * ImageHeader.NumFrames); i++) {
@@ -313,13 +315,12 @@ void ReportImageProperties(HWND hDlg, WCHAR* Filename)
 		if (InputImage[i] < ImageMin) ImageMin = InputImage[i];;
 	}
 
-
 	// report contents of image header
 	TCHAR pszMessageBuf[MAX_PATH];
 	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
 		TEXT("Image Pixel file Properties\n# of frames: %d\nXsize: %d\nYsize: %d\nPixelSize: %d byte(s)\nTotal non-zero pixels %d\nPixel range min: %d, max: %d"),
 		(int)ImageHeader.NumFrames, (int)ImageHeader.Xsize, (int)ImageHeader.Ysize,
-		(int)ImageHeader.PixelSize, NonZeroPixels, ImageMin,ImageMax);
+		(int)ImageHeader.PixelSize, NonZeroPixels, ImageMin, ImageMax);
 	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
 
 	return;
@@ -349,7 +350,7 @@ int ReadImageHeader(WCHAR* Filename, IMAGINGHEADER* ImageHeader)
 	size_t iRead;
 
 	ErrNum = _wfopen_s(&In, Filename, L"rb");
-	if (In==NULL) {
+	if (In == NULL) {
 		return -1;
 	}
 
@@ -458,15 +459,16 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 		return iRes;
 	}
 	if (InputHeader.NumFrames != 1) {
-		if (StartFrame<0 || StartFrame>EndFrame || 
-			StartFrame >= InputHeader.NumFrames || 
+		if (StartFrame<0 || StartFrame>EndFrame ||
+			StartFrame >= InputHeader.NumFrames ||
 			EndFrame >= InputHeader.NumFrames)
 		{
 			MessageBox(hDlg, L"Start Frame or EndFrame invalid", L"File I/O", MB_OK);
 			return 0;
 		}
 		CopyFrames = (EndFrame - StartFrame) + 1;
-	} else {
+	}
+	else {
 		StartFrame = 0;
 		CopyFrames = 1;
 	}
@@ -489,8 +491,8 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	InputFrameSize = InputHeader.Xsize * InputHeader.Ysize;
 	OutputFrameSize = OutputXsize * OutputYsize;
 
-	Image = (int*)calloc((size_t)InputFrameSize * (size_t)CopyFrames, sizeof(int) );
-	if (Image==NULL) { 
+	Image = (int*)calloc((size_t)InputFrameSize * (size_t)CopyFrames, sizeof(int));
+	if (Image == NULL) {
 		fclose(In);
 		MessageBox(hDlg, L"Input Image alloc failure", L"File I/O", MB_OK);
 		return -1;
@@ -498,7 +500,8 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	// initially skip frames that are not required
 	if (StartFrame != 0) {
 		SkipSize = (StartFrame * InputFrameSize * InputHeader.PixelSize) + InputHeader.HeaderSize;
-	} else {
+	}
+	else {
 		SkipSize = InputHeader.HeaderSize;
 	}
 	if (fseek(In, SkipSize, SEEK_SET) != 0) {
@@ -522,7 +525,8 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 		}
 		else if (InputHeader.PixelSize == 2) {
 			Image[i] = (int)Pixel.Short;
-		} else {
+		}
+		else {
 			// Pixel size is 4
 			Image[i] = (int)Pixel.Long;
 		}
@@ -530,10 +534,10 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	fclose(In);
 
 	SubImage = (int*)calloc((size_t)SubimageXsize *
-							(size_t)SubimageYsize *
-							(size_t)CopyFrames,
-							sizeof(int));
-	if (SubImage==NULL) {
+		(size_t)SubimageYsize *
+		(size_t)CopyFrames,
+		sizeof(int));
+	if (SubImage == NULL) {
 		free(Image);
 		MessageBox(hDlg, L"Sub Image alloc failure", L"File I/O", MB_OK);
 		return -1;
@@ -545,7 +549,8 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	if (!Centered) {
 		Startx = SubimageXloc;
 		Starty = SubimageYloc;
-	} else {
+	}
+	else {
 		Startx = SubimageXloc - (SubimageXsize / 2);
 		Starty = SubimageYloc - (SubimageYsize / 2);
 	}
@@ -569,7 +574,8 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	if (!Centered) {
 		Startx = 0;
 		Starty = 0;
-	} else {
+	}
+	else {
 		Startx = (OutputXsize / 2) - (SubimageXsize / 2);
 		Starty = (OutputYsize / 2) - (SubimageYsize / 2);
 	}
@@ -580,10 +586,10 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 		Image[Address] = 0;
 	}
 	for (int CurrentFrame = 0; CurrentFrame < CopyFrames; CurrentFrame++) {
-		InputOffset = CurrentFrame * (SubimageXsize* SubimageYsize);
+		InputOffset = CurrentFrame * (SubimageXsize * SubimageYsize);
 		OutputOffset = CurrentFrame * OutputFrameSize;
 		for (int i = 0, y = Starty; i < SubimageYsize; i++, y++) {
-			SubAddress = i * SubimageXsize+ InputOffset;
+			SubAddress = i * SubimageXsize + InputOffset;
 			Address = y * OutputXsize + Startx + OutputOffset;
 			for (int j = 0; j < SubimageXsize; j++) {
 				Image[Address] = SubImage[SubAddress];
@@ -595,7 +601,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 
 	// write result to output file
 	ErrNum = _wfopen_s(&Out, OutputImageFile, L"wb");
-	if (Out==NULL) {
+	if (Out == NULL) {
 		free(Image);
 		free(SubImage);
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
@@ -603,10 +609,10 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	}
 
 	// write out upated header for output file
-	OutputHeader.Endian = (short) -1;
-	OutputHeader.HeaderSize = (short) sizeof(IMAGINGHEADER);
+	OutputHeader.Endian = (short)-1;
+	OutputHeader.HeaderSize = (short)sizeof(IMAGINGHEADER);
 	OutputHeader.ID = (short)0xaaaa;
-	OutputHeader.NumFrames = (short) CopyFrames;
+	OutputHeader.NumFrames = (short)CopyFrames;
 	OutputHeader.Version = (short)1;
 	OutputHeader.PixelSize = InputHeader.PixelSize;
 	OutputHeader.Xsize = OutputXsize;
@@ -620,18 +626,20 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	fwrite(&OutputHeader, sizeof(IMAGINGHEADER), 1, Out);
 
 	// write to output file
-	for (Address = 0; Address < (OutputFrameSize*CopyFrames); Address++) {
+	for (Address = 0; Address < (OutputFrameSize * CopyFrames); Address++) {
 		if (OutputHeader.PixelSize == 1) {
 			Pixel.Byte[0] = Image[Address];
 			if (ScaleBinary && Pixel.Byte != 0) {
 				Pixel.Byte[0] = 255;
 			}
-		} else if (OutputHeader.PixelSize == 2) {
+		}
+		else if (OutputHeader.PixelSize == 2) {
 			Pixel.Short = Image[Address];
 			if (ScaleBinary && Pixel.Short != 0) {
 				Pixel.Short = 255;
 			}
-		} else {
+		}
+		else {
 			Pixel.Long = Image[Address];
 			if (ScaleBinary && Pixel.Long != 0) {
 				Pixel.Long = 255;
@@ -685,7 +693,7 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 	int iRes;
 
 	iRes = ReadImageHeader(ImageInputFile, &InputHeader);
-	if(iRes!=1){
+	if (iRes != 1) {
 		MessageBox(hDlg, L"First image file is not valid", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
@@ -700,8 +708,8 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 	}
 
 	if (!IncrFrames && InputHeader.NumFrames != InputHeader2.NumFrames) {
-		MessageBox(hDlg, L"per frame append (ySize*2) requires both files to have same # of frames", 
-					L"Incompatible file type", MB_OK);
+		MessageBox(hDlg, L"per frame append (ySize*2) requires both files to have same # of frames",
+			L"Incompatible file type", MB_OK);
 		return -5;
 	}
 
@@ -710,7 +718,8 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 	if (IncrFrames) {
 		// all frames in file1 followed by all frames in files 2
 		OutputHeader.NumFrames = InputHeader.NumFrames + InputHeader2.NumFrames;
-	} else {
+	}
+	else {
 		// frame by frame append (i.e frame1 file 1 + frame1 File2, frame3 file 1 + frame3 File2, ...) 
 		OutputHeader.Ysize = InputHeader.Ysize * 2;
 	}
@@ -765,21 +774,21 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 		for (int i = 0; i < InputHeader.NumFrames; i++) {
 			int Offset;
 			Offset = i * InputHeader.Xsize * InputHeader.Ysize;
-			for(int j=0; j< InputHeader.Xsize* InputHeader.Ysize; j++) {
-				PixelValue = Image1[j+Offset];
+			for (int j = 0; j < InputHeader.Xsize * InputHeader.Ysize; j++) {
+				PixelValue = Image1[j + Offset];
 				fwrite(&PixelValue, OutputHeader.PixelSize, 1, Out);
 			}
 			// Xsize and Ysize are same for both input images
 			for (int j = 0; j < InputHeader.Xsize * InputHeader.Ysize; j++) {
-				PixelValue = Image2[j+Offset];
+				PixelValue = Image2[j + Offset];
 				fwrite(&PixelValue, OutputHeader.PixelSize, 1, Out);
 			}
 		}
 	}
 
 	fclose(Out);
-	delete [] Image1;
-	delete [] Image2;
+	delete[] Image1;
+	delete[] Image2;
 
 	if (DisplayResults) {
 		DisplayImage(ImageOutputFile);
@@ -1015,7 +1024,7 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 //
 //******************************************************************************
 int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile,
-				 int ScalePixel, int LinearOnly, int EnableBatch, int GenerateBMP)
+	int ScalePixel, int LinearOnly, int EnableBatch, int GenerateBMP)
 {
 	FILE* Out;
 	IMAGINGHEADER ImgHeader;
@@ -1039,14 +1048,14 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		return iRes;
 	}
 
-	if (LinearOnly && ImgHeader.Ysize!=1) {
+	if (LinearOnly && ImgHeader.Ysize != 1) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Input file requires linear image file (Ysize=1)", L"File incompatible", MB_OK);
 		return -4;
 	}
 
 	NumKernels = ReadReoderingFile(TextInput, &DecomX, &DecomY, &DecomXsize, &DecomYsize, LinearOnly, EnableBatch);
-	if(NumKernels<=0) {
+	if (NumKernels <= 0) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Pixel reodering file read failure", L"File incompatible", MB_OK);
 		return -4;
@@ -1086,7 +1095,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		KernelOffset = Kernel * DecomXsize * DecomYsize;
 
 		ComputeReordering(DecomAddress, ImgHeader.Xsize, ImgHeader.Ysize, DecomX + KernelOffset, DecomY + KernelOffset, DecomXsize, DecomYsize);
-		
+
 		if (EnableBatch) {
 			// for Batch processing, cutup filename, reassemble with index number (Kernel)
 			int err;
@@ -1202,8 +1211,8 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 //
 //*******************************************************************************
 int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
-						int* DecomXsize, int* DecomYsize, int LinearOnly,
-						int EnableBatch)
+	int* DecomXsize, int* DecomYsize, int LinearOnly,
+	int EnableBatch)
 {
 	int iRes;
 	int iFormat;
@@ -1222,7 +1231,7 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 	// the file format
 
 	iFormat = fscanf_s(TextIn, "%d,%d,%d", DecomXsize, DecomYsize, &LinearFormat);
-	if (iFormat != 2 && iFormat !=3) {
+	if (iFormat != 2 && iFormat != 3) {
 		fclose(TextIn);
 		return -4;
 	}
@@ -1267,12 +1276,12 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 	//
 	// read rest of reordering kernel
 	//
-	DecomX = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize)*(size_t)NumKernels];
+	DecomX = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize) * (size_t)NumKernels];
 	if (DecomX == NULL) {
 		fclose(TextIn);
 		return -1;
 	}
-	DecomY = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize)*(size_t)NumKernels];
+	DecomY = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize) * (size_t)NumKernels];
 	if (DecomY == NULL) {
 		delete[] DecomY;
 		fclose(TextIn);
@@ -1332,8 +1341,8 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 // private function for PixelReorder()
 //
 //*******************************************************************************
-int ConvertDecomList2Relative(int* DecomX, int *DecomY, int DecomXsize, int DecomYsize,
-								int NumKernels)
+int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int DecomYsize,
+	int NumKernels)
 {
 	int* NewDecomX = new int[(size_t)DecomXsize * (size_t)DecomYsize * (size_t)NumKernels];
 	if (NewDecomX == NULL) {
@@ -1375,7 +1384,7 @@ int ConvertDecomList2Relative(int* DecomX, int *DecomY, int DecomXsize, int Deco
 		DecomX[i] = NewDecomX[i];
 		DecomY[i] = NewDecomY[i];
 	}
-	
+
 	delete[] NewDecomX;
 	delete[] NewDecomY;
 	return 1;
@@ -1388,7 +1397,7 @@ int ConvertDecomList2Relative(int* DecomX, int *DecomY, int DecomXsize, int Deco
 //
 //*******************************************************************************
 void ComputeReordering(int* DecomAddress, int xsize, int ysize, int* DecomX, int* DecomY,
-					   int DecomXsize, int DecomYsize)
+	int DecomXsize, int DecomYsize)
 {
 	int x, y;
 	int LinearAddress = 0;
@@ -1397,7 +1406,7 @@ void ComputeReordering(int* DecomAddress, int xsize, int ysize, int* DecomX, int
 	int Ykernel, Xkernel;
 	int DecomXYindex;
 	int Offset;
-	
+
 	TotalSize = xsize * ysize;
 
 	// translate current x,y into Decom list position
@@ -1429,10 +1438,6 @@ void ComputeReordering(int* DecomAddress, int xsize, int ysize, int* DecomX, int
 // 256 wide image then the output file will be 128 wide.  If it is not split in
 // the middle then the ouput image width will be larger to accomodate the fold.
 // This is not an issue.  Think of folding a piece of paper and how it may overlap.
-// 
-// Restrictions: The input image file must be even in xsize.  This restriction
-// may be removed after testing but the current algorithm has not been verified
-// for correct operation.
 // 
 // Parameters:
 //	HWND hDlg				Handle of calling window or dialog
@@ -1473,7 +1478,6 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (!Out) {
 		delete[] InputImage;
-		_fcloseall();
 		MessageBox(hDlg, L"Could not open results file", L"File I/O", MB_OK);
 		return -2;
 	}
@@ -1490,18 +1494,38 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 	PIXEL Pixel;
 	int i;
 	int y;
-
-	if (FoldColumn < (InputXsize / 2)) {
+	// Calculations need to work for both even and odd sized image sizes
+	if ((float)FoldColumn < ((float)InputXsize / 2.0)) {
 		// extend image to left
-		StartXleft = (FoldColumn - (InputXsize / 2)) - 1;
-		StartXright = InputXsize - 1;
-		OutputXsize = InputXsize / 2 + ((InputXsize / 2) - FoldColumn);
+		if (InputXsize % 2 == 0) {
+			// This is an even sized image
+			StartXleft = (FoldColumn - (InputXsize / 2)) - 1;
+			StartXright = InputXsize - 1;
+			OutputXsize = InputXsize / 2 + ((InputXsize / 2) - FoldColumn);
+		}
+		else {
+			// this is an odd sized image
+			// this section need verification
+			StartXleft = (FoldColumn - (InputXsize / 2)) - 1;
+			StartXright = InputXsize - 1;
+			OutputXsize = (InputXsize / 2) + 1 + ((InputXsize / 2) - FoldColumn);
+		}
 	}
-	else if (FoldColumn > (InputXsize / 2)) {
+	else if ((float)FoldColumn > ((float)InputXsize / 2.0)) {
 		// extend image to right
-		StartXleft = 0;
-		StartXright = InputXsize + (FoldColumn - (InputXsize / 2));
-		OutputXsize = InputXsize / 2 + (FoldColumn - (InputXsize / 2));
+		if (InputXsize % 2 == 0) {
+			// this is an even sized image
+			StartXleft = 0;  //look at this
+			StartXright = InputXsize + (FoldColumn - (InputXsize / 2));
+			OutputXsize = InputXsize / 2 + (FoldColumn - (InputXsize / 2));
+		}
+		else {
+			// this is an odd sized image
+			// this section need verification
+			StartXleft = 0;  //look at this
+			StartXright = InputXsize + (FoldColumn - (InputXsize / 2));
+			OutputXsize = (InputXsize / 2 + 1) + (FoldColumn - (int)(((float)InputXsize / 2.0) + 0.5));
+		}
 	}
 	else {
 		// fold through the center
@@ -1513,7 +1537,7 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 	// write new header
 	ImageHeader.Xsize = OutputXsize;
 	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
-	
+
 	// fold image
 	for (int Frame = 0; Frame < ImageHeader.NumFrames; Frame++) {
 		Offset = Frame * InputXsize * InputYsize;
@@ -1540,10 +1564,12 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 				if (ImageHeader.PixelSize == 1) {
 					if (Pixel.Long > 255) Pixel.Long = 255; //clip output
 					fwrite(&Pixel.Byte, 1, 1, Out);
-				} else if (ImageHeader.PixelSize == 2) {
+				}
+				else if (ImageHeader.PixelSize == 2) {
 					if (Pixel.Long > 65535) Pixel.Long = 65535; // clip output
 					fwrite(&Pixel.Short, 2, 1, Out);
-				} else {
+				}
+				else {
 					fwrite(&Pixel.Long, 4, 1, Out);
 				}
 			}
@@ -1552,7 +1578,7 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 
 	fclose(Out);
 	delete[] InputImage;
-	
+
 	if (DisplayResults) {
 		DisplayImage(OutputFile);
 	}
@@ -1574,10 +1600,6 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 // 256 wide image then the output file will be 128 wide.  If it is not split in
 // the middle then the ouput image width will be larger to accomodate the fold.
 // This is not an issue.  Think of folding a piece of paper and how it may overlap.
-// 
-// Restrictions: The input image file must be even in xsize.  This restriction
-// may be removed after testing but the current algorithm has not been verified
-// for correct operation.
 // 
 // Parameters:
 //	HWND hDlg				Handle of calling window or dialog
@@ -1636,17 +1658,37 @@ int FoldImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColum
 	int i;
 	int y;
 
-	if (FoldColumn < (InputXsize / 2)) {
-		// extend image to left
-		StartXleft = FoldColumn - 1;
-		StartXright = FoldColumn;
-		OutputXsize = InputXsize / 2 + ((InputXsize / 2) - FoldColumn);
+	if ((float)FoldColumn < ((float)InputXsize / 2.0)) {
+		if (InputXsize % 2 == 0) {
+			// extend image to left
+			// This is an even sized image
+			StartXleft = FoldColumn - 1;
+			StartXright = FoldColumn;
+			OutputXsize = InputXsize / 2 + ((InputXsize / 2) - FoldColumn);
+		}
+		else {
+			// this is an odd sized image
+			// this section need verification
+			StartXleft = FoldColumn - 1;
+			StartXright = FoldColumn;
+			OutputXsize = InputXsize / 2 + 1 + ((InputXsize / 2) - FoldColumn); //?? this not correct
+		}
 	}
-	else if (FoldColumn > (InputXsize / 2)) {
+	else if ((float)FoldColumn > ((float)InputXsize / 2.0)) {
 		// extend image to right
-		StartXleft = FoldColumn - 1;
-		StartXright = FoldColumn;
-		OutputXsize = InputXsize / 2 + (FoldColumn - (InputXsize / 2));
+		if (InputXsize % 2 == 0) {
+			// This is an even sized image
+			StartXleft = FoldColumn - 1;
+			StartXright = FoldColumn;
+			OutputXsize = InputXsize / 2 + (FoldColumn - (InputXsize / 2));
+		}
+		else {
+			// This is an odd sized image
+			// this section need verification
+			StartXleft = FoldColumn - 1;
+			StartXright = FoldColumn;
+			OutputXsize = InputXsize / 2 + (FoldColumn - (InputXsize / 2)); //?? this is not correct
+		}
 	}
 	else {
 		// fold through the center
@@ -2085,9 +2127,9 @@ int AccordionImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Accor
 	FoldSize = InputXsize / NumFolds;
 	OutputXsize = InputXsize / 2;
 
-	OutputImage = (int *) calloc((size_t)OutputXsize * (size_t)InputYsize * (size_t)ImageHeader.NumFrames, sizeof(int));
-	if (OutputImage==NULL) {
-		delete [] InputImage;
+	OutputImage = (int*)calloc((size_t)OutputXsize * (size_t)InputYsize * (size_t)ImageHeader.NumFrames, sizeof(int));
+	if (OutputImage == NULL) {
+		delete[] InputImage;
 		MessageBox(hDlg, L"Output Image alloc failure", L"File I/O", MB_OK);
 		return -1;
 	}
@@ -2106,7 +2148,7 @@ int AccordionImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Accor
 					LeftAddress = y * InputXsize + LeftX + InputOffset;
 					LeftPixel = InputImage[LeftAddress];;
 					RightPixel = InputImage[RightAddress];
-					OutputImage[Address] = (int) (LeftPixel + RightPixel);
+					OutputImage[Address] = (int)(LeftPixel + RightPixel);
 				}
 			}
 		}
@@ -2336,7 +2378,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
 	int iRes;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if(iRes!=1){
+	if (iRes != 1) {
 		MessageBox(hDlg, L"Error reading input file", L"File I/O", MB_OK);
 		return iRes;
 	}
@@ -2352,7 +2394,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
 	// 
 	// write out image header
 	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
-	
+
 	int Address = 0;
 
 	for (int Frame = 0; Frame < ImageHeader.NumFrames; Frame++) {
@@ -2478,7 +2520,7 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
 	if (iRes != 1) {
-		MessageBox(hDlg, L"Could not load input image", L"File I/O error",MB_OK);
+		MessageBox(hDlg, L"Could not load input image", L"File I/O error", MB_OK);
 		return iRes;
 	}
 
@@ -2530,14 +2572,14 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 	int FrameOffset;
 	for (int Frame = 0; Frame < ImageHeader.NumFrames; Frame++) {
 		FrameOffset = Frame * ImageHeader.Xsize * ImageHeader.Ysize;
-		Convolve(Kernel, KernelXsize, KernelYsize, InputImage+FrameOffset, OutputImage+FrameOffset,
-				 ImageHeader.Xsize, ImageHeader.Ysize);
+		Convolve(Kernel, KernelXsize, KernelYsize, InputImage + FrameOffset, OutputImage + FrameOffset,
+			ImageHeader.Xsize, ImageHeader.Ysize);
 	}
 	delete[] InputImage;
 	delete[] Kernel;
 
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
-	if (Out==NULL) {
+	if (Out == NULL) {
 		free(OutputImage);
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
 		return -2;
@@ -2714,7 +2756,7 @@ int AddImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* OutputFile)
 	delete[] InputImage2;
 
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
-	if (Out==NULL) {
+	if (Out == NULL) {
 		delete[] OutputImage;
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
 		return -2;
@@ -2814,7 +2856,7 @@ int RotateImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 			for (y = 0; y < inputYsize; y++) {
 				InputAddress = y * inputXsize + Offset;
 				for (x = 0; x < inputXsize; x++) {
-					OutputAddress = ((inputXsize-1)-x) * inputYsize + Offset + y;
+					OutputAddress = ((inputXsize - 1) - x) * inputYsize + Offset + y;
 					InputPixel = InputImage[InputAddress + x];
 					OutputImage[OutputAddress] = InputPixel;
 				}
@@ -2828,7 +2870,7 @@ int RotateImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 			for (y = 0; y < inputYsize; y++) {
 				InputAddress = y * inputXsize + Offset;
 				for (x = 0; x < inputXsize; x++) {
-					OutputAddress = Offset + ((inputYsize-1)-y) + (inputYsize*x);
+					OutputAddress = Offset + ((inputYsize - 1) - y) + (inputYsize * x);
 					InputPixel = InputImage[InputAddress + x];
 					OutputImage[OutputAddress] = InputPixel;
 				}
@@ -2950,7 +2992,7 @@ int MirrorImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 		for (int Frame = 0; Frame < NumFrames; Frame++) {
 			Offset = Frame * FrameSize;
 			for (y = 0; y < ImageHeader.Ysize; y++) {
-				OutputAddress = ((ImageHeader.Ysize-1)-y) * ImageHeader.Xsize + Offset;
+				OutputAddress = ((ImageHeader.Ysize - 1) - y) * ImageHeader.Xsize + Offset;
 				InputAddress = y * ImageHeader.Xsize + Offset;
 				for (x = 0; x < ImageHeader.Xsize; x++) {
 					InputPixel = InputImage[InputAddress + x];
@@ -3161,7 +3203,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 		}
 		if (Kernel[i] < 0 || Kernel[i]>1) {
 			// kernel values can only be 0 or 1
-			delete [] Kernel;
+			delete[] Kernel;
 			fclose(TextIn);
 			delete[] InputImage;
 			return 0;
@@ -3181,7 +3223,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 		NumSetinRow = 0;
 		BlankRow = TRUE;
 		for (int x = 0; x < KernelXsize; x++) {
-			if (Kernel[x + Offset]!=0) {
+			if (Kernel[x + Offset] != 0) {
 				NumSetinRow++;
 				BlankRow = FALSE;
 			}
@@ -3214,7 +3256,8 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 	int OutYsize;
 
 	OutXsize = NumFoundinRow * (ImageHeader.Xsize / KernelXsize);
-	OutYsize = ImageHeader.Ysize - NumBlankRows;
+	OutYsize = KernelYsize - NumBlankRows;
+	OutYsize = OutYsize * (ImageHeader.Ysize / KernelYsize);
 
 	// Apply decimation kernel
 	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize * (size_t)ImageHeader.NumFrames];
@@ -3282,7 +3325,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 
 	fclose(Out);
 	delete[] OutputImage;
-	
+
 	if (DisplayResults) {
 		DisplayImage(OutputFile);
 	}

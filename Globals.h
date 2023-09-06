@@ -20,3 +20,4 @@ extern HWND hwndMain;
 extern HWND hwndImage;
 extern HINSTANCE hInst;
 extern INT_PTR CALLBACK ImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+extern void MessageMySETIappError(HWND hWnd, int ErrNo, const wchar_t* Title);

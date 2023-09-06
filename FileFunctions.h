@@ -13,6 +13,8 @@ void ExportFile(HWND hWnd, int wmId);
 int SaveBMP(WCHAR* Filename, WCHAR* InputFile, int RGBframes, int AutoScale);
 int SaveTXT(WCHAR* Filename, WCHAR* InputFile);
 int DisplayImage(WCHAR* Filename);
+int ImportBMP(HWND hWnd);
+int HEX2Binary(HWND hWnd);
 
 BOOL GetProductAndVersion(CString* strProductName,
     CString* strProductVersion,

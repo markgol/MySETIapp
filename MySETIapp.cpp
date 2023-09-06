@@ -70,6 +70,9 @@
 //                      Added batch processing for reordering,  This allows a series of
 //                      reorder kernels to be used.  Each kernel adds an index number
 //                      onto the output filename.
+// V1.2.1.1 2023-09-06  Added import BMP to image file (.raw). Must be 1 bit, 8 bit, or 24 bit
+//                      Added HEX text file to binary file
+//                      Corrected ImageDlg to display results file only once.
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -131,11 +134,11 @@ HWND hwndImage = NULL;
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+void                MessageMySETIappError(HWND hWnd, int ErrNo, const wchar_t* Title);
 
 // Declaration for callback dialog procedures in other modules
 
 INT_PTR CALLBACK    AboutDlg(HWND, UINT, WPARAM, LPARAM);
-
 INT_PTR CALLBACK    BitTextStreamDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    BitHexDumpDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    BitExtractDlg(HWND, UINT, WPARAM, LPARAM);
@@ -362,6 +365,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 break;
             }
 
+            case IDM_IMPORT_BMP:
+            {
+                int iRes;
+                iRes = ImportBMP(hWnd);
+                if (iRes != 1) {
+                    MessageMySETIappError(hWnd, iRes,L"BMP file import");
+                }
+                break;
+            }
+
+            case IDM_FILE_HEX2BINARY:
+                int iRes;
+                iRes = HEX2Binary(hWnd);
+                if (iRes != 1) {
+                    MessageMySETIappError(hWnd, iRes, L"Convert HEX to Binary file");
+                }
+                break;
+
             case IDM_FILE_TOBMP:
             case IDM_FILE_TOTXT:
                 ExportFile(hWnd, wmId);
@@ -528,4 +549,49 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
     return 0;
+}
+
+//******************************************************************************
+//
+// FoldImageRight
+//
+//******************************************************************************
+void MessageMySETIappError(HWND hWnd, int ErrNo, const wchar_t* Title) {
+    switch (ErrNo) {
+    case 1:
+        MessageBox(hWnd, L"Success", Title, MB_OK);
+        break;
+
+    case 0:
+        MessageBox(hWnd, L"Parameter or format invalid", Title, MB_OK);
+        break;
+
+    case -1:
+        MessageBox(hWnd, L"Memory allocation failure\nexit application", Title, MB_OK);
+        break;
+
+    case -2:
+        MessageBox(hWnd, L"File was not found or could not be opened", Title, MB_OK);
+        break;
+
+    case -3:
+        MessageBox(hWnd, L"File read error", Title, MB_OK);
+        break;
+
+    case -4:
+        MessageBox(hWnd, L"Invalid file type", Title, MB_OK);
+        break;
+
+    case -5:
+        MessageBox(hWnd, L"Sizes mismatched", Title, MB_OK);
+        break;
+
+    case -6:
+        MessageBox(hWnd, L"Not yet implemented", Title, MB_OK);
+        break;
+
+    default:
+        break;
+    }
+    return;
 }

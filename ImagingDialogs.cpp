@@ -28,6 +28,7 @@
 //                      Added batch processing for reordering,  This allows a series of
 //                      reorder kernels to be used.  Each kernel adds an index number
 //                      onto the output filename.
+// V1.2.1.1 2023-09-06  Corrected ImageDlg to display results file only once.
 //
 // Imaging tools dialog box handlers
 // 
@@ -87,6 +88,23 @@ INT_PTR CALLBACK ImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
                 ShowWindow(hwndImage, SW_HIDE);
             }
             return (INT_PTR)TRUE;
+
+        case IDC_GENERATE_BMP:
+        {
+            // Initialize COM
+            HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+            // use the default Windows viewer for BMP file
+            ShellExecute(hDlg, 0, szBMPFilename, 0, 0, SW_NORMAL);
+
+            // release COM
+            CoUninitialize();
+
+            return (INT_PTR)TRUE;
+        }
+
+        default:
+            return (INT_PTR)FALSE;
         }
     case WM_PAINT:
     {
@@ -102,15 +120,6 @@ INT_PTR CALLBACK ImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
             TextOut(hDC,40,20, szBMPFilename, (int) wcslen(szBMPFilename));
             TextOut(hDC, 40, 40, L"using external BMP viewer", 25);
             EndPaint(hDlg, &ps);
-
-            // Initialize COM
-            HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-
-            // use the default Windows viewer for BMP file
-            ShellExecute(hDlg, 0, szBMPFilename, 0, 0, SW_NORMAL);
-
-            // release COM
-            CoUninitialize();
         }
         break;
     }

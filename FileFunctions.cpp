@@ -43,7 +43,10 @@
 // Some function return TRUE/FALSE results
 // 
 // V1.0.0.1 2023-08-20, Initial Release
-// V1.1.0.1 2023-08-22, Added file type specifications to open/save dialogs
+// V1.1.0.1 2023-08-22  Added file type specifications to open/save dialogs
+// V1.2.1.1 2023-09-06  Added ImportBMP
+//                      Added Hex2Binary
+//                      Corrected ImageDlg to display results file only once.
 //
 #include "framework.h"
 #include "resource.h"
@@ -567,7 +570,8 @@ int DisplayImage(WCHAR* Filename)
             hwndImage = CreateDialog(hInst, MAKEINTRESOURCE(IDD_IMAGE), hwndMain, ImageDlg);
         }
         if (hwndImage != NULL) {
-            InvalidateRect(hwndImage, NULL, TRUE);
+            PostMessage(hwndImage, WM_COMMAND, IDC_GENERATE_BMP, 0l);
+            //InvalidateRect(hwndImage, NULL, TRUE);
             ShowWindow(hwndImage, SW_SHOW);
         }
         return 1;
@@ -1180,54 +1184,456 @@ int SaveTXT(WCHAR* Filename, WCHAR* InputFile)
 {
     int iRes;
     int* InputImage;
-    IMAGINGHEADER ImageHeader;
+IMAGINGHEADER ImageHeader;
 
-    iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-    if (iRes != 1) {
-        return iRes;
-    }
+iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
+if (iRes != 1) {
+    return iRes;
+}
 
-    FILE* Out;
-    errno_t ErrNum;
-    int Address;
+FILE* Out;
+errno_t ErrNum;
+int Address;
 
-    ErrNum = _wfopen_s(&Out, Filename, L"w");
-    if (Out == NULL) {
-        delete[] InputImage;
-        return -2;
-    }
+ErrNum = _wfopen_s(&Out, Filename, L"w");
+if (Out == NULL) {
+    delete[] InputImage;
+    return -2;
+}
 
-    // save file in text format, blank line between frames
-    Address = 0;
-    int Pixel;
+// save file in text format, blank line between frames
+Address = 0;
+int Pixel;
 
-    for (int Frame = 0; Frame < ImageHeader.NumFrames; Frame++) {
-        for (int y = 0; y < ImageHeader.Ysize; y++) {
-            for (int x = 0; x < ImageHeader.Xsize; x++) {
-                Pixel = InputImage[Address];
-                // make sure pixel is not less than 0
-                if (Pixel < 0) Pixel = 0;
-                if (ImageHeader.PixelSize == 1) {
-                    // clip value to match pixel size
-                    if (Pixel > 255) Pixel = 255;
-                    fprintf(Out, "%3d ", Pixel);
-                }
-                else if (ImageHeader.PixelSize == 1) {
-                    // clip value to match pixel size
-                    if (Pixel > 65535) Pixel = 65535;
-                    fprintf(Out, "%5d ", Pixel);
-                }
-                else { 
-                    fprintf(Out, "%7d ", Pixel);
-                }
-                Address++;
+for (int Frame = 0; Frame < ImageHeader.NumFrames; Frame++) {
+    for (int y = 0; y < ImageHeader.Ysize; y++) {
+        for (int x = 0; x < ImageHeader.Xsize; x++) {
+            Pixel = InputImage[Address];
+            // make sure pixel is not less than 0
+            if (Pixel < 0) Pixel = 0;
+            if (ImageHeader.PixelSize == 1) {
+                // clip value to match pixel size
+                if (Pixel > 255) Pixel = 255;
+                fprintf(Out, "%3d ", Pixel);
             }
-            fprintf(Out, "\n");
+            else if (ImageHeader.PixelSize == 1) {
+                // clip value to match pixel size
+                if (Pixel > 65535) Pixel = 65535;
+                fprintf(Out, "%5d ", Pixel);
+            }
+            else {
+                fprintf(Out, "%7d ", Pixel);
+            }
+            Address++;
         }
         fprintf(Out, "\n");
     }
-    fclose(Out);
-    delete[] InputImage;
+    fprintf(Out, "\n");
+}
+fclose(Out);
+delete[] InputImage;
+
+return 1;
+}
+
+//****************************************************************
+//
+//  ImportBMP
+// 
+//****************************************************************
+int ImportBMP(HWND hWnd)
+{
+    WCHAR InputFilename[MAX_PATH];
+    WCHAR OutputFilename[MAX_PATH];
+
+    GetPrivateProfileString(L"ImportBMP", L"InputFile", L"*.bmp", InputFilename, MAX_PATH, (LPCTSTR)strAppNameINI);
+    GetPrivateProfileString(L"ImportBMP", L"OutputFile", L"*.raw", OutputFilename, MAX_PATH, (LPCTSTR)strAppNameINI);
+
+    PWSTR pszFilename;
+    COMDLG_FILTERSPEC BMPType[] =
+    {
+         { L"BMP files", L"*.bmp" },
+         { L"All Files", L"*.*" }
+    };
+
+    COMDLG_FILTERSPEC IMGType[] =
+    {
+         { L"Image files", L"*.raw" },
+         { L"All Files", L"*.*" }
+    };
+
+    if (!CCFileOpen(hWnd, InputFilename, &pszFilename, FALSE, 2, BMPType, L".bmp")) {
+        return 1;
+    }
+    wcscpy_s(InputFilename, pszFilename);
+    CoTaskMemFree(pszFilename);
+
+    if (!CCFileSave(hWnd, OutputFilename, &pszFilename, FALSE, 2, IMGType, L".bmp")) {
+        return 1;
+    }
+    wcscpy_s(OutputFilename, pszFilename);
+    CoTaskMemFree(pszFilename);
+
+    WritePrivateProfileString(L"ImportBMP", L"InputFile", InputFilename, (LPCTSTR)strAppNameINI);
+    WritePrivateProfileString(L"ImportBMP", L"OutputFile", OutputFilename, (LPCTSTR)strAppNameINI);
+
+    int Invert=0;
+    if (MessageBox(hWnd, L"Invert Image?", L"Conversion parameter", MB_YESNO) == IDYES) {
+        Invert = 1;
+    }
+
+    // open BMP file
+    FILE* BMPfile;
+    errno_t ErrNum;
+    int iRes;
+
+    ErrNum = _wfopen_s(&BMPfile, InputFilename, L"rb");
+    if (!BMPfile) {
+        return -2;
+    }
+
+    // read BMP headers
+    BITMAPFILEHEADER BMPheader;
+    BITMAPINFOHEADER BMPinfoheader;
+    int StrideLen;
+    int* Image;
+    BYTE* Stride;
+
+    iRes = (int)fread(&BMPheader, sizeof(BITMAPFILEHEADER), 1, BMPfile);
+    if (iRes != 1) {
+        fclose(BMPfile);
+        return -4;
+    }
+
+    iRes = (int)fread(&BMPinfoheader, sizeof(BITMAPINFOHEADER), 1, BMPfile);
+    if (iRes != 1) {
+        fclose(BMPfile);
+        return -4;
+    }
+
+    // verify this type of file can be imported
+    if (BMPheader.bfType != 0x4d42 || BMPheader.bfReserved1 != 0 || BMPheader.bfReserved2 != 0) {
+        // this is not a BMP file
+        fclose(BMPfile);
+        return -4;
+    }
+    if (BMPinfoheader.biSize != sizeof(BITMAPINFOHEADER)) {
+        // this is not a BMP file
+        fclose(BMPfile);
+        return -4;
+    }
+
+    if (BMPinfoheader.biCompression != BI_RGB) {
+        // this is wrong type of BMP file
+        fclose(BMPfile);
+        return 0;
+    }
+    if (BMPinfoheader.biBitCount != 1 && BMPinfoheader.biBitCount != 8 && 
+         BMPinfoheader.biBitCount != 24 && BMPinfoheader.biPlanes!=1) {
+        // this is wrong type of BMP file
+        fclose(BMPfile);
+        return 0;
+    }
+
+    // read in image
+    int BMPimageBytes;
+    int TopDown = 1;
+    if (BMPinfoheader.biHeight < 0) {
+        TopDown = 0;
+        BMPinfoheader.biHeight = -BMPinfoheader.biHeight;
+    }
+
+    // BMP files have a specific requirement for # of bytes per line
+    // This is called stride.  The formula used is from the specification.
+    StrideLen = ((((BMPinfoheader.biWidth * BMPinfoheader.biBitCount) + 31) & ~31) >> 3); // 24 bpp
+    BMPimageBytes = StrideLen * BMPinfoheader.biHeight; // size of image in bytes
+
+    // allocate stride
+    Stride = new BYTE[(size_t)StrideLen];
+    if (Stride == NULL) {
+        fclose(BMPfile);
+        return -1;
+    }
+
+    if (BMPinfoheader.biBitCount == 1) {
+        // This is bit image, has color table, 2 entries
+        // Skip the 2 RGBQUAD entries
+        if (fseek(BMPfile, sizeof(RGBQUAD) * 2, SEEK_CUR) != 0) {
+            delete[] Stride;
+            fclose(BMPfile);
+            return -4;
+        }
+        int BitCount;
+        int StrideIndex;
+        int Offset;
+
+        // allocate Image
+        // alocate array of 'int's to receive image
+        Image = new int[(size_t)BMPinfoheader.biWidth * (size_t)BMPinfoheader.biHeight];
+        if (Image == NULL) {
+            delete[] Stride;
+            fclose(BMPfile);
+            return -1;
+        }
+
+        // BMPimage of BMPimageBytes
+        for (int y = 0; y < BMPinfoheader.biHeight; y++) {
+            // read stride
+            iRes = (int)fread(Stride, 1, StrideLen, BMPfile);
+            if (iRes != StrideLen) {
+                delete[] Image;
+                delete[] Stride;
+                fclose(BMPfile);
+                return -4;
+            }
+            BitCount = 0;
+            StrideIndex = 0;
+            if (TopDown) {
+                Offset = ((BMPinfoheader.biHeight-1) - y) * BMPinfoheader.biWidth;
+            }
+            else {
+                Offset = y * BMPinfoheader.biWidth;
+            }
+            for (int x = 0; x < BMPinfoheader.biWidth; x++) {
+                // split out bit by bit
+                Image[Offset + x] = Stride[StrideIndex] & (0x80 >> BitCount);
+                if (Image[Offset + x]!=0) {
+                    if (Invert == 0) {
+                        Image[Offset + x] = 1;
+                    }
+                    else {
+                        Image[Offset + x] = 0;
+                    }
+                }
+                else {
+                    if (Invert == 0) {
+                        Image[Offset + x] = 0;
+                    }
+                    else {
+                        Image[Offset + x] = 1;
+                    }
+                }
+                BitCount++;
+                if (BitCount == 8) {
+                    BitCount = 0;
+                    StrideIndex++;
+                }
+            }
+        }
+    }
+    else if(BMPinfoheader.biBitCount == 8){
+        // this is a byte image, has color table, 256 entries
+        // Skip the 256 RGBQUAD entries
+        if (fseek(BMPfile, sizeof(RGBQUAD) * 256, SEEK_CUR) != 0) {
+            delete[] Stride;
+            fclose(BMPfile);
+            return -4;
+        }
+
+        // allocate Image
+        // alocate array of 'int's to receive image
+        Image = new int[(size_t)BMPinfoheader.biWidth * (size_t)BMPinfoheader.biHeight];
+        if (Image == NULL) {
+            delete[] Stride;
+            fclose(BMPfile);
+            return -1;
+        }
+
+        // BMPimage of BMPimageBytes
+        int Offset;
+
+        for (int y = 0; y < BMPinfoheader.biHeight; y++) {
+            // read stride
+            iRes = (int)fread(Stride, 1, StrideLen, BMPfile);
+            if (iRes != StrideLen) {
+                delete[] Image;
+                delete[] Stride;
+                fclose(BMPfile);
+                return -4;
+            }
+            if (TopDown) {
+                Offset = ((BMPinfoheader.biHeight - 1) - y) * BMPinfoheader.biWidth;
+            }
+            else {
+                Offset = y * BMPinfoheader.biWidth;
+            }
+
+            for (int x = 0; x < BMPinfoheader.biWidth; x++) {
+                Image[Offset + x] = Stride[x];
+            }
+        }
+    }
+    else {
+        // this is a 24 bit, RGB image
+        // The color table is biClrUsed long
+        if (BMPinfoheader.biClrUsed != 0) {
+            // skip the color table if present
+            if (fseek(BMPfile, sizeof(RGBQUAD) * BMPinfoheader.biClrUsed, SEEK_CUR) != 0) {
+                delete[] Stride;
+                fclose(BMPfile);
+                return -4;
+            }
+        }
+        
+        Image = new int[(size_t)BMPinfoheader.biWidth * (size_t)BMPinfoheader.biHeight * (size_t)3];
+        if (Image == NULL) {
+            delete[] Stride;
+            fclose(BMPfile);
+            return -1;
+        }
+
+        // BMPimage of BMPimageBytes
+        int Offset;
+        int RedFrame = 0;
+        int GreenFrame = BMPinfoheader.biHeight * BMPinfoheader.biWidth;
+        int BlueFrame = BMPinfoheader.biHeight * BMPinfoheader.biWidth * 2;
+
+        for (int y = 0; y < BMPinfoheader.biHeight; y++) {
+            // read stride
+            iRes = (int)fread(Stride, 1, StrideLen, BMPfile);
+            if (iRes != StrideLen) {
+                delete[] Image;
+                delete[] Stride;
+                fclose(BMPfile);
+                return -4;
+            }
+            if (TopDown) {
+                Offset = ((BMPinfoheader.biHeight - 1) - y) * BMPinfoheader.biWidth;
+            }
+            else {
+                Offset = y * BMPinfoheader.biWidth;
+            }
+
+            for (int x = 0; x < BMPinfoheader.biWidth; x++) {
+                Image[BlueFrame + Offset + x] = Stride[x * 3 + 0];
+                Image[GreenFrame + Offset + x] = Stride[x * 3 + 1];
+                Image[RedFrame + Offset + x] = Stride[x * 3 + 2];
+            }
+        }
+    }
+
+    delete[] Stride;
+    fclose(BMPfile);
+
+    // save image
+    IMAGINGHEADER ImgHeader;
+    ImgHeader.Endian = (short)-1;  // PC format
+    ImgHeader.HeaderSize = (short)sizeof(IMAGINGHEADER);
+    ImgHeader.ID = (short)0xaaaa;
+    ImgHeader.Version = (short)1;
+    ImgHeader.NumFrames = (short)3;
+    ImgHeader.PixelSize = (short)1;
+    ImgHeader.Xsize = BMPinfoheader.biWidth;
+    ImgHeader.Ysize = BMPinfoheader.biHeight;
+    ImgHeader.Padding[0] = 0;
+    ImgHeader.Padding[1] = 0;
+    ImgHeader.Padding[2] = 0;
+    ImgHeader.Padding[3] = 0;
+    ImgHeader.Padding[4] = 0;
+    ImgHeader.Padding[5] = 0;
+
+    FILE* ImgFile;
+    ErrNum = _wfopen_s(&ImgFile, OutputFilename, L"wb");
+    if (ImgFile==NULL) {
+        delete[] Image;
+        return -2;
+    }
+
+    BYTE Pixel;
+    fwrite(&ImgHeader, sizeof(IMAGINGHEADER), 1, ImgFile);
+
+    for (int i = 0; i < (ImgHeader.Xsize*ImgHeader.Ysize * 3) ; i++) {
+        if (Image[i] <= 0) {
+            Pixel = 0;
+        }
+        else if(Image[i] > 255) {
+            Pixel = 255;
+        }
+        else {
+            Pixel = Image[i];
+        }
+        fwrite(&Pixel, 1, 1, ImgFile);
+    }
+    fclose(ImgFile);
+    delete[] Image;
+
+    if (DisplayResults) {
+        DisplayImage(OutputFilename);
+    }
+
+    return 1;
+}
+
+//****************************************************************
+//
+//  Hex2Binary
+// 
+//****************************************************************
+int HEX2Binary(HWND hWnd)
+{
+    WCHAR InputFilename[MAX_PATH];
+    WCHAR OutputFilename[MAX_PATH];
+
+    GetPrivateProfileString(L"Hex2Binary", L"InputFile", L"*.txt", InputFilename, MAX_PATH, (LPCTSTR)strAppNameINI);
+    GetPrivateProfileString(L"Hex2Binary", L"OutputFile", L"", OutputFilename, MAX_PATH, (LPCTSTR)strAppNameINI);
+
+    PWSTR pszFilename;
+    COMDLG_FILTERSPEC txtType[] =
+    {
+         { L"Text files", L"*.txt" },
+         { L"All Files", L"*.*" }
+    };
+
+    COMDLG_FILTERSPEC AllType[] =
+    {
+         { L"BMP files", L"*.bmp" },
+         { L"Image files", L"*.raw" },
+         { L"All Files", L"*.*" }
+    };
+
+    if (!CCFileOpen(hWnd, InputFilename, &pszFilename, FALSE, 2, txtType, L".bmp")) {
+        return 1;
+    }
+    wcscpy_s(InputFilename, pszFilename);
+    CoTaskMemFree(pszFilename);
+
+    if (!CCFileSave(hWnd, OutputFilename, &pszFilename, FALSE, 3, AllType, L"")) {
+        return 1;
+    }
+    wcscpy_s(OutputFilename, pszFilename);
+    CoTaskMemFree(pszFilename);
+
+    WritePrivateProfileString(L"Hex2Binary", L"InputFile", InputFilename, (LPCTSTR)strAppNameINI);
+    WritePrivateProfileString(L"Hex2Binary", L"OutputFile", OutputFilename, (LPCTSTR)strAppNameINI);
+
+    FILE* Input;
+    FILE* Output;
+    errno_t ErrNum;
+    BYTE HexValue;
+    int HexRead;
+    int iRes;
+
+    ErrNum = _wfopen_s(&Input, InputFilename, L"rb");
+    if (Input ==NULL) {
+        return -2;
+    }
+
+    ErrNum = _wfopen_s(&Output, OutputFilename, L"wb");
+    if (Output == NULL) {
+        return -2;
+    }
+
+    while (!feof(Input)) {
+        iRes = fscanf_s(Input, "%2x", &HexRead);
+        if (iRes != 1) {
+            break;
+        }
+        HexValue = (BYTE)HexRead;
+        fwrite(&HexValue, 1, 1, Output);
+    }
+
+    fclose(Output);
+    fclose(Input);
 
     return 1;
 }
