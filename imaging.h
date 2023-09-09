@@ -63,7 +63,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile);
 
 int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile);
 
-int AddImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* OutputFile);
+int AddSubtractImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* OutputFile, int ADDflag);
 
 int RotateImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction);
 
@@ -78,3 +78,5 @@ int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int Deco
 int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize);
 
 int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int ScalePixel);
+
+int AddConstant2Image(WCHAR *InputFile, WCHAR *OutputFile, int Value);

@@ -79,6 +79,10 @@
 //                      Removed Autosize flag from settings.
 //                      Corrected bug introduced in V1.2.1 where incorrect frame size
 //                      was used in the ImportBMP function.
+// V1.2.4.1 2023-09-xx  Added Add/Subtract a constant from entire image
+//                      Changed Sum images to Add/Subtract images
+//                      Added import of CamIRa IMG files (not applicable to A Sign in Space project)
+//                      Cleanup of file open/save dialogs
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -173,6 +177,7 @@ INT_PTR CALLBACK    ResizeDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    GlobalSettingsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Text2StreamDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    AddConstantDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -394,6 +399,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 ExportFile(hWnd, wmId);
                 break;
 
+            case IDM_IMPORT_CAMIRA:
+            {
+                int iRes;
+                iRes = CamIRaImport(hWnd);
+                if (iRes != 1) {
+                    MessageMySETIappError(hWnd, iRes, L"CamIRa IMG file import");
+                }
+                break;
+            }
+
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, AboutDlg);
                 break;
@@ -522,6 +537,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case IDM_IMAGETOOLS_RESIZE:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_RESIZE), hWnd, ResizeDlg);
+                break;
+
+            case IDM_ADDSUBTRACT_CONSTANT:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_ADD_CONSTANT), hWnd, AddConstantDlg);
                 break;
 
             case IDM_SETTINGS:

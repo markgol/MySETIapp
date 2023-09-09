@@ -836,6 +836,105 @@ void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 
 //******************************************************************************
 //
+// BatchBitStream2Image
+// 
+// Convert packed binary bitstream file to image file
+// 
+// Parameters:
+//  HWND hDlg               Handle of calling window or dialog
+//  WCHAR* InputFile        Packed Binary Btstream input file
+//  CHAR* OutputFile        baseline Name of text file to output an index number is added to the filename
+//                          representing the xsize value used in the file
+//  int PrologueSize        # of bits to skip in prologue
+//  int BlockHeaderBits     # of block header bits to skip
+//  int NumBlockBodyBits    # of bits in block (each block is converted to a frame
+//                          in the output image file) 
+//  int BlockNum            # of block in bitstream (becomes # of frames
+//                          in the output image file
+//  int xsize               # of pixels in a row, starting value for batch
+//  int xsizeEnd            # of pixels in a row, ending value for batch
+//  int BitDepth            # of bits converted per pixel
+//  int BitOrder            0 - LSB to MSB, 1 - MSB to LSB
+//  int BitScale            Scale binary output, 0,1 -> 0,255
+// 
+//  The Ysize of the image is calculated as Ysize = NumBlockBodyBits/(xsize*bitdepth)
+//
+//******************************************************************************
+void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
+    int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize, int xsizeEnd, 
+    int BitDepth, int BitOrder, int BitScale)
+{
+    int SaveDisplayResults;
+
+    SaveDisplayResults = DisplayResults;
+    DisplayResults = 0;
+
+    for (int CurrentXsize = xsize; CurrentXsize <= xsizeEnd; CurrentXsize++) {
+        // for Batch processing, cutup filename, reassemble with index number (Kernel)
+        int err;
+        WCHAR Drive[_MAX_DRIVE];
+        WCHAR Dir[_MAX_DIR];
+        WCHAR Fname[_MAX_FNAME];
+        WCHAR Ext[_MAX_EXT];
+
+        // split apart original filename
+        err = _wsplitpath_s(OutputFile, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+            _MAX_FNAME, Ext, _MAX_EXT);
+        if (err != 0) {
+            MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+            DisplayResults = SaveDisplayResults;
+            return;
+        }
+        // change the fname portion to add _kernel# 1 based
+        // use Kernel+1
+        WCHAR NewFname[_MAX_FNAME];
+        WCHAR NewFilename[MAX_PATH];
+        WCHAR BMPfilename[MAX_PATH];
+
+        swprintf_s(NewFname, _MAX_FNAME, L"%s_%d", Fname, CurrentXsize);
+
+        // reassemble filename
+        err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, NewFname, Ext);
+        if (err != 0) {
+            MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+            DisplayResults = SaveDisplayResults;
+            return;
+        }
+        // create BMP of file
+        if (SaveDisplayResults) {
+            err = _wmakepath_s(BMPfilename, _MAX_PATH, Drive, Dir, NewFname, L".bmp");
+            if (err != 0) {
+                MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+                DisplayResults = SaveDisplayResults;
+                return;
+            }
+        }
+
+        // add CurrentXsize index to filename portion
+        // reconstruct full filename
+        
+        err= BitStream2Image(hDlg, InputFile, NewFilename,
+            PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, CurrentXsize,
+            BitDepth, BitOrder, BitScale);
+        if (err != 1) {
+            TCHAR pszMessageBuf[MAX_PATH];
+            StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+                TEXT("Error occurred while processing batch# %d\nEror# %d\n"),
+                CurrentXsize, err);
+            MessageBox(hDlg, pszMessageBuf, L"Batch process Bit stream to image file", MB_OK);
+            return;
+        }
+        if (SaveDisplayResults) {
+            SaveBMP(BMPfilename, NewFilename, FALSE, AutoScaleResults);
+        }
+    }
+
+    DisplayResults = SaveDisplayResults;
+    return;
+}
+
+//******************************************************************************
+//
 // BitStream2Image
 // 
 // Convert packed binary bitstream file to image file
@@ -858,7 +957,7 @@ void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 //  The Ysize of the image is calculated as Ysize = NumBlockBodyBits/(xsize*bitdepth)
 //
 //******************************************************************************
-void BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
+int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
     int BitDepth, int BitOrder, int BitScale)
 {
@@ -881,41 +980,37 @@ void BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
         long bit32;
     } Pixel;
 
+    if (xsize <= 0) {
+        MessageBox(hDlg, L"x size must be >= 1", L"File I/O", MB_OK);
+        return 0;
+    }
+
+    if (NumBlockBodyBits <= 0) {
+        MessageBox(hDlg, L"# bits in block >= 1", L"File I/O", MB_OK);
+        return 0;
+    }
+
+    if (BitDepth <= 0 || BitDepth > 32) {
+        MessageBox(hDlg, L"1 <= Image bit depth <= 32", L"File I/O", MB_OK);
+        return 0;
+    }
+
+    if (BitDepth != 1 && BitScale) {
+        MessageBox(hDlg, L"Scale Binary can only be used if Image bit depth is 1", L"File I/O", MB_OK);
+        return 0;
+    }
+
     ErrNum = _wfopen_s(&In, InputFile, L"rb");
     if (In==NULL) {
         MessageBox(hDlg, L"Could not open input file", L"File I/O", MB_OK);
-        return;
+        return -2;
     }
 
     ErrNum = _wfopen_s(&OutRaw, OutputFile, L"wb");
     if (OutRaw==NULL) {
         fclose(In);
         MessageBox(hDlg, L"Could not open raw output file", L"File I/O", MB_OK);
-        return;
-    }
-
-    if (xsize <= 0) {
-        MessageBox(hDlg, L"x size must be >= 1", L"File I/O", MB_OK);
-    }
-
-    if (NumBlockBodyBits <= 0) {
-        MessageBox(hDlg, L"# bits in block >= 1", L"File I/O", MB_OK);
-    }
-
-    if (BitDepth<=0 || BitDepth>32) {
-        MessageBox(hDlg, L"1 <= Image bit depth <= 32", L"File I/O", MB_OK);
-        return;
-    }
-
-    if (NumBlockBodyBits % (xsize * BitDepth)) {
-        MessageBox(hDlg, L"# bits in block must be divisble by (Xsize * Bit depth)", L"File I/O", MB_OK);
-        return;
-    }
-
-    if (BitDepth != 1 && BitScale) {
-        MessageBox(hDlg, L"Scale Binary can only be used if Image bit depth is 1", L"File I/O", MB_OK);
-        return;
-        return;
+        return -2;
     }
 
     // Initialize image file header
@@ -1073,13 +1168,14 @@ void BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
                 CurrentPageBit = 0;
                 CurrentPixelBit = BitDepth - 1;
                 CurrentPage++;
-                // for now exit after is page
-                fclose(In);
-                fclose(OutRaw);
-                if (DisplayResults) {
-                    DisplayImage(OutputFile);
+                if (CurrentPage==BlockNum) {
+                    fclose(In);
+                    fclose(OutRaw);
+                    if (DisplayResults) {
+                        DisplayImage(OutputFile);
+                    }
+                    return 1;
                 }
-                return;
             }
         }
     }
@@ -1088,7 +1184,7 @@ void BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     if (DisplayResults) {
         DisplayImage(OutputFile);
     }
-    return;
+    return 1;
 }
 
 //*******************************************************************

@@ -39,6 +39,7 @@
 #define IDD_IMGTOOLS_DECIMATION         156
 #define IDD_IMGTOOLS_RESIZE             157
 #define IDD_BITTOOLS_TEXT2STREAM        158
+#define IDD_IMGTOOLS_ADD_CONSTANT       159
 #define IDC_CONVERT                     1000
 #define IDC_ABOUT_AUTHOR                1001
 #define IDC_XSIZE                       1001
@@ -61,6 +62,8 @@
 #define IDC_NUM_FRAMES2                 1006
 #define IDC_TEXT_OUTPUT                 1007
 #define IDC_ADD                         1007
+#define IDC_ADD2                        1008
+#define IDC_SUBTRACT                    1008
 #define IDC_BLOCK_BITS                  1011
 #define IDC_XSIZEI                      1012
 #define IDC_BLOCK_NUM                   1013
@@ -103,8 +106,10 @@
 #define IDC_BITORDER                    1039
 #define IDC_OUTPUT_BROWSE               1039
 #define IDC_SCALE_PIXEL                 1040
+#define IDC_VALUE                       1040
 #define IDC_GENERATE_BMP                1041
 #define IDC_BATCH                       1042
+#define IDC_XSIZE_END                   1042
 #define IDC_REORDER                     1074
 #define IDC_IMAGE_INPUT_BROWSE          1077
 #define IDC_IMAGE_INPUT                 1078
@@ -150,27 +155,20 @@
 #define IDC_FILE_OPEN                   32838
 #define IDM_IMAGETOOLS_ROTATE           32842
 #define IDM_IMAGETOOLS_MIRROR           32844
-#define ID_BITTOOLS_BITSTREAMDECIMATION 32846
-#define ID_BITTOOLS_DECIMATION          32847
-#define ID_IMAGETOOLS_IMAGEDECIMATION   32848
 #define IDM_IMAGETOOLS_DECIMATION       32849
 #define IDM_BITTOOLS_DECIMATION         32850
-#define ID_IMAGETOOLS_RESIZEIMAGE       32851
-#define ID_IMAGETOOLS_RESIZE            32852
 #define IDM_IMAGETOOLS_RESIZE           32853
-#define ID_BITTOOLS_VITERBIENCODER      32854
-#define ID_BITTOOLS_VITERBIDECODER      32855
-#define ID_BITTOOLS_ENCODE              32856
 #define IDM_BITTOOLS_ENCODE             32857
 #define IDM_BITTOOLS_DECODER            32858
-#define ID_BITTOOLS_TEXTBITSTREAMTOPACKEDBITSTREAM 32859
-#define ID_BITTOOLS_TEXT2BITSTREAM      32860
 #define IDM_BITTOOLS_TEXT2BITSTREAM     32861
-#define ID_FILE_IMPORTBMPFILE           32862
 #define IDM_FILE_IMPORT_BMP             32863
 #define IDM_IMPORT_BMP                  32864
-#define ID_FILE_HEXFILETOBINARYFILE     32865
 #define IDM_FILE_HEX2BINARY             32866
+#define IDM_IMPORT_CAMIRA               32868
+#define IDM_IMAGE_SUBTRACTCONSTANT      32870
+#define IDM_IMGTOOLS_SUBTRACTCONSTANT   32871
+#define IDM_SUBTRACT_CONSTANT           32872
+#define IDM_ADDSUBTRACT_CONSTANT        32873
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -179,8 +177,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        138
-#define _APS_NEXT_COMMAND_VALUE         32867
-#define _APS_NEXT_CONTROL_VALUE         1040
+#define _APS_NEXT_COMMAND_VALUE         32874
+#define _APS_NEXT_CONTROL_VALUE         1043
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

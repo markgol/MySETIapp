@@ -42,6 +42,8 @@
 //                      reorder kernels to be used.  Each kernel adds an index number
 //                      onto the output filename.
 // V1.2.1.1 2023-09-06	Decimation process, corrected incorrect calculation for new Y dimension
+// V1.2.4.1 2023-09-xx	Added Add/Subtract constant from images
+//						Changed Sum images to add/subtract images
 //
 #include "framework.h"
 #include "stdio.h"
@@ -2517,7 +2519,6 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 	FILE* Out;
 	IMAGINGHEADER ImageHeader;
 
-
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
 	if (iRes != 1) {
 		MessageBox(hDlg, L"Could not load input image", L"File I/O error", MB_OK);
@@ -2703,13 +2704,15 @@ int CalculateConvPixel(int x, int y, int* Image, float* Kernel, int KernelXsize,
 //	WCHAR* InputFile		Image file to sum next wnext file
 //	WCHAR* InputFile2		Image file to sum
 //	WCHAR* OutputFile		Summed image file
+//	int	AddFlag				TRUE -  added images
+//							FALSE - Subtract 2nd image from 1st image
 // 
 //  return value:
 //  1 - Success
 //  !=1 Error see standardized app error list at top of this source file
 //
 //*******************************************************************************
-int AddImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* OutputFile)
+int AddSubtractImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* OutputFile, int AddFlag)
 {
 	int iRes;
 	int* InputImage1;
@@ -2748,7 +2751,12 @@ int AddImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* OutputFile)
 	}
 
 	for (int i = 0; i < (Input1Header.Xsize * Input1Header.Ysize * Input1Header.NumFrames); i++) {
-		OutputImage[i] = InputImage1[i] + InputImage2[i];
+		if (AddFlag) {
+			OutputImage[i] = InputImage1[i] + InputImage2[i];
+		}
+		else {
+			OutputImage[i] = InputImage1[i] - InputImage2[i];
+		}
 		if (OutputImage[i] < 0) OutputImage[i] = 0;
 	}
 
@@ -3169,11 +3177,14 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 	int KernelXsize;
 	int KernelYsize;
 
-	LoadImageFile(&InputImage, InputFile, &ImageHeader);
-
+	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
+	if (iRes != 1) {
+		return iRes;
+	}
 	// read decimation kernel
 	ErrNum = _wfopen_s(&TextIn, TextFile, L"r");
 	if (!TextIn) {
+		delete[] InputImage;
 		return -2;
 	}
 
@@ -3325,6 +3336,74 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 
 	fclose(Out);
 	delete[] OutputImage;
+
+	if (DisplayResults) {
+		DisplayImage(OutputFile);
+	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
+// AddConstant2Image
+// 
+//******************************************************************************
+int AddConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value)
+{
+	int iRes;
+	int* InputImage;
+	int* OutputImage;
+	errno_t ErrNum;
+	PIXEL Pixel;
+	FILE* Out;
+	IMAGINGHEADER InputHeader;
+
+	iRes = LoadImageFile(&InputImage, InputFile, &InputHeader);
+	if (iRes != 1) {
+		return iRes;
+	}
+
+	OutputImage = new int[(size_t)InputHeader.Xsize * (size_t)InputHeader.Ysize * (size_t)InputHeader.NumFrames];
+	if (OutputImage == NULL) {
+		delete[] InputImage;
+		return -1;
+	}
+
+	for (int i = 0; i < (InputHeader.Xsize * InputHeader.Ysize * InputHeader.NumFrames); i++) {
+		OutputImage[i] = InputImage[i] + Value;
+		if (OutputImage[i] < 0) OutputImage[i] = 0;
+	}
+
+	delete[] InputImage;
+
+	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+	if (Out == NULL) {
+		delete[] OutputImage;
+		return -2;
+	}
+
+	//write output image
+	fwrite(&InputHeader, sizeof(InputHeader), 1, Out);
+
+	// write image
+	for (int i = 0; i < (InputHeader.Xsize * InputHeader.Ysize * InputHeader.NumFrames); i++) {
+		Pixel.Long = OutputImage[i];
+		if (InputHeader.PixelSize == 1) {
+			if (Pixel.Long > 255) Pixel.Long = 255;
+			fwrite(&Pixel.Byte, 1, 1, Out);
+		}
+		else if (InputHeader.PixelSize == 2) {
+			if (Pixel.Long > 65535) Pixel.Long = 65535;
+			fwrite(&Pixel.Short, 2, 1, Out);
+		}
+		else {
+			fwrite(&Pixel.Long, 4, 1, Out);
+		}
+	}
+
+	delete[] OutputImage;
+	fclose(Out);
 
 	if (DisplayResults) {
 		DisplayImage(OutputFile);

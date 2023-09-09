@@ -8,10 +8,6 @@ void BitDistance(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize);
 
 void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int PrologueSize);
 
-void BitStreamToGreyscaleImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, WCHAR* OutputFileRaw,
-    int PrologueSize, int NumPageHeaderBits, int NumPageBodyBits,
-    int xsize, int BitDepth, BOOL BitOrder);
-
 void FileHexDump(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int xsize);
 
 void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
@@ -20,8 +16,12 @@ void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int SkipSize, int CopyBits, int xsize);
 
-void BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
+int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
     int BitDepth, int BitOrder, int BitScale);
+
+void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
+    int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
+    int xsizeEnd, int BitDepth, int BitOrder, int BitScale);
 
 int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile);

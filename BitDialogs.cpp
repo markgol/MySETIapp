@@ -24,6 +24,7 @@
 // V1.1.0.1 2023-08-22  Added file type specifications to open/save dialogs
 // V1.2.0.1 2023-08-31  Added text to packed bit stream file
 // V1.2.2.1 2023-09-06  Changed default folders\filenames
+// V1.2.4.1 2023-09-xx  Added a batch mode for bitstream to image file
 //
 // Bit tools dialog box handlers
 // 
@@ -969,6 +970,9 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
         GetPrivateProfileString(L"BitImageDlg", L"xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_XSIZE, szString);
 
+        GetPrivateProfileString(L"BitImageDlg", L"xsizeEnd", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XSIZE_END, szString);
+
         GetPrivateProfileString(L"BitImageDlg", L"BlockNum", L"1", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BLOCK_NUM, szString);
 
@@ -1042,6 +1046,7 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             WCHAR OutputFile[MAX_PATH];
             int PrologueSize;
             int xsize;
+            int xsizeEnd;
             int BlockNum;
             int NumBlockBodyBits;
             int BlockHeaderBits;
@@ -1059,6 +1064,7 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             NumBlockBodyBits = GetDlgItemInt(hDlg, IDC_BLOCK_BITS, &bSuccess, TRUE);
 
             xsize = GetDlgItemInt(hDlg, IDC_XSIZE, &bSuccess, TRUE);
+            xsizeEnd = GetDlgItemInt(hDlg, IDC_XSIZE_END, &bSuccess, TRUE);
 
             BlockNum = GetDlgItemInt(hDlg, IDC_BLOCK_NUM, &bSuccess, TRUE);
 
@@ -1072,9 +1078,16 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
                 BitScale = 1;
             }
 
-            BitStream2Image(hDlg, InputFile, OutputFile,
-                PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize,
-                BitDepth, BitOrder, BitScale);
+            if (xsize >= xsizeEnd) {
+                BitStream2Image(hDlg, InputFile, OutputFile,
+                    PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize,
+                    BitDepth, BitOrder, BitScale);
+            }
+            else {
+                BatchBitStream2Image(hDlg, InputFile, OutputFile,
+                    PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize, xsizeEnd,
+                    BitDepth, BitOrder, BitScale);
+            }
             
             // save output filename in global
             wcscpy_s(szCurrentFilename, OutputFile);
@@ -1100,6 +1113,9 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
             GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
             WritePrivateProfileString(L"BitImageDlg", L"xsize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XSIZE_END, szString, MAX_PATH);
+            WritePrivateProfileString(L"BitImageDlg", L"xsizeEnd", szString, (LPCTSTR)strAppNameINI);
 
             GetDlgItemText(hDlg, IDC_BLOCK_NUM, szString, MAX_PATH);
             WritePrivateProfileString(L"BitImageDlg", L"BlockNum", szString, (LPCTSTR)strAppNameINI);

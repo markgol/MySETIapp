@@ -50,6 +50,8 @@
 // V1.2.2.1 2023-09-06  Path must exist check is done on selected files in dialogs.
 //                      Corrected bug introduced in V1.2.1 where incorrect frame size
 //                      was used in the ImportBMP function.
+// V1.2.4.1 2023-09-xx  Added import CamIRa IMG file
+//                      Clean up of file open/save filename handling
 //
 #include "framework.h"
 #include "resource.h"
@@ -105,6 +107,35 @@ if (SUCCEEDED(hr))
 
     if (SUCCEEDED(hr))
     {
+        if (wcscmp(pszCurrentFilename, L"") != 0) {
+            //parse for just filename
+            int err;
+            WCHAR Drive[_MAX_DRIVE];
+            WCHAR Dir[_MAX_DIR];
+            WCHAR Fname[_MAX_FNAME];
+            WCHAR Ext[_MAX_EXT];
+            WCHAR Directory[MAX_PATH];
+
+            // split apart original filename
+            err = _wsplitpath_s(pszCurrentFilename, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                _MAX_FNAME, Ext, _MAX_EXT);
+            if (err != 0) {
+                return FALSE;
+            }
+
+            err = _wmakepath_s(Directory, _MAX_PATH, Drive, Dir, L"", L"");
+            if (err != 0) {
+                return FALSE;
+            }
+
+            IShellItem* pCurFolder = NULL;
+            hr = SHCreateItemFromParsingName(Directory, NULL, IID_PPV_ARGS(&pCurFolder));
+            if (SUCCEEDED(hr)) {
+                hr = pFileOpen->SetFolder(pCurFolder);
+                pCurFolder->Release();
+            }
+        }
+
         if (!bSelectFolder) {
             hr = pFileOpen->SetOptions(FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST);
             if (NumTypes != 0 && FileTypes!=NULL) {
@@ -113,13 +144,31 @@ if (SUCCEEDED(hr))
             if (szDefExt != NULL) {
                 hr = pFileOpen->SetDefaultExtension(szDefExt);
             }
+
+            if (wcscmp(pszCurrentFilename, L"") != 0)
+            {
+                //parse for just filename
+                int err;
+                WCHAR Drive[_MAX_DRIVE];
+                WCHAR Dir[_MAX_DIR];
+                WCHAR Fname[_MAX_FNAME];
+                WCHAR Ext[_MAX_EXT];
+
+                // split apart original filename
+                err = _wsplitpath_s(pszCurrentFilename, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                    _MAX_FNAME, Ext, _MAX_EXT);
+                if (err != 0) {
+                    return FALSE;
+                }
+     
+                WCHAR NewFname[_MAX_FNAME];
+
+                swprintf_s(NewFname, _MAX_FNAME, L"%s%s", Fname, Ext);
+                hr = pFileOpen->SetFileName(NewFname);
+            }
+
         } else {
             hr = pFileOpen->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST); // This selects only a folder, not a filename
-        }
-        
-        if (wcscmp(pszCurrentFilename, L"") != 0)
-        {
-            hr = pFileOpen->SetFileName(pszCurrentFilename);
         }
 
         // Show the Open dialog box.
@@ -197,6 +246,35 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
 
         if (SUCCEEDED(hr))
         {
+            if (wcscmp(pszCurrentFilename, L"") != 0) {
+                //parse for just filename
+                int err;
+                WCHAR Drive[_MAX_DRIVE];
+                WCHAR Dir[_MAX_DIR];
+                WCHAR Fname[_MAX_FNAME];
+                WCHAR Ext[_MAX_EXT];
+                WCHAR Directory[MAX_PATH];
+
+                // split apart original filename
+                err = _wsplitpath_s(pszCurrentFilename, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                    _MAX_FNAME, Ext, _MAX_EXT);
+                if (err != 0) {
+                    return FALSE;
+                }
+
+                err = _wmakepath_s(Directory, _MAX_PATH, Drive, Dir, L"", L"");
+                if (err != 0) {
+                    return FALSE;
+                }
+
+                IShellItem* pCurFolder = NULL;
+                hr = SHCreateItemFromParsingName(Directory, NULL, IID_PPV_ARGS(&pCurFolder));
+                if (SUCCEEDED(hr)) {
+                    hr = pFileSave->SetFolder(pCurFolder);
+                    pCurFolder->Release();
+                }
+            }
+
             if (!bSelectFolder) {
                 hr = pFileSave->SetOptions(FOS_FORCEFILESYSTEM | FOS_OVERWRITEPROMPT || FOS_PATHMUSTEXIST);
                 if (NumTypes != 0 && FileTypes != NULL) {
@@ -205,15 +283,33 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
                 if (szDefExt != NULL) {
                     hr = pFileSave->SetDefaultExtension(szDefExt);
                 }
+
+                if (wcscmp(pszCurrentFilename, L"") != 0)
+                {
+                    //parse for just filename
+                    int err;
+                    WCHAR Drive[_MAX_DRIVE];
+                    WCHAR Dir[_MAX_DIR];
+                    WCHAR Fname[_MAX_FNAME];
+                    WCHAR Ext[_MAX_EXT];
+
+                    // split apart original filename
+                    err = _wsplitpath_s(pszCurrentFilename, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                        _MAX_FNAME, Ext, _MAX_EXT);
+                    if (err != 0) {
+                        return FALSE;
+                    }
+
+                    WCHAR NewFname[_MAX_FNAME];
+
+                    swprintf_s(NewFname, _MAX_FNAME, L"%s%s", Fname, Ext);
+                    hr = pFileSave->SetFileName(NewFname);
+                }
+
             } else {
                 hr = pFileSave->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST); // This selects only a folder, not a filename
             }
-            
-            if (wcscmp(pszCurrentFilename, L"") != 0)
-            {
-                hr = pFileSave->SetFileName(pszCurrentFilename);
-            }
-            
+                     
             // Show the Open dialog box.
             hr = pFileSave->Show(NULL);
 
@@ -1641,5 +1737,157 @@ int HEX2Binary(HWND hWnd)
     fclose(Output);
     fclose(Input);
 
+    return 1;
+}
+
+//****************************************************************
+//
+//  CamIRaImport
+// 
+//****************************************************************
+int CamIRaImport(HWND hWnd)
+{
+    // This structure must be exact since it is saved in a file.
+#pragma pack(1)
+    struct IMAGE_HEADER {
+        short FirstWord;	// -1
+        short Xsize;		// number of pixels in a line (# of columns)
+        short Ysize;		// number of lines (# of rows)
+        short PixelSize;	// # of bytes/pixel
+        short Dummy1[16];   // ignore these
+        short SelectFrames;	// <-10 use NumFrames1,  >10 use NumFrames2
+        short NumFrames1;	// # of image frames in file. if SelectFrames <= 10 use this
+        short Dummy2[206];  // ignore these
+        INT32 NumFrames2;	// # of frames in file. If SelectFrames > 10 use this
+        short Dummy3[26];   // ignore these
+    } CamIRaHeader;
+#pragma pack()
+
+    WCHAR InputFilename[MAX_PATH];
+    WCHAR OutputFilename[MAX_PATH];
+
+    GetPrivateProfileString(L"CamIRaImport", L"InputFile", L"*.img", InputFilename, MAX_PATH, (LPCTSTR)strAppNameINI);
+    GetPrivateProfileString(L"CamIRaImport", L"OutputFile", L"", OutputFilename, MAX_PATH, (LPCTSTR)strAppNameINI);
+
+    PWSTR pszFilename;
+    COMDLG_FILTERSPEC txtType[] =
+    {
+         { L"Text files", L"*.img" },
+         { L"All Files", L"*.*" }
+    };
+
+    COMDLG_FILTERSPEC AllType[] =
+    {
+         { L"Image files", L"*.raw" },
+         { L"All Files", L"*.*" }
+    };
+
+    if (!CCFileOpen(hWnd, InputFilename, &pszFilename, FALSE, 2, txtType, L".img")) {
+        return 1;
+    }
+    wcscpy_s(InputFilename, pszFilename);
+    CoTaskMemFree(pszFilename);
+
+    if (!CCFileSave(hWnd, OutputFilename, &pszFilename, FALSE, 2, AllType, L".raw")) {
+        return 1;
+    }
+    wcscpy_s(OutputFilename, pszFilename);
+    CoTaskMemFree(pszFilename);
+
+    WritePrivateProfileString(L"CamIRaImport", L"InputFile", InputFilename, (LPCTSTR)strAppNameINI);
+    WritePrivateProfileString(L"CamIRaImport", L"OutputFile", OutputFilename, (LPCTSTR)strAppNameINI);
+
+    FILE* Input;
+    FILE* Output;
+    errno_t ErrNum;
+
+    ErrNum = _wfopen_s(&Input, InputFilename, L"rb");
+    if (Input == NULL) {
+        return -2;
+    }
+
+    int iRes;
+    int HeaderLen;
+    HeaderLen = sizeof(CamIRaHeader);
+    iRes = fread(&CamIRaHeader, HeaderLen, 1, Input);
+    if (iRes != 1) {
+        fclose(Input);
+        return -4;
+    }
+
+    if (CamIRaHeader.FirstWord != -1 && CamIRaHeader.PixelSize!=1 && CamIRaHeader.PixelSize!=2) {
+        fclose(Input);
+        return -4;
+    }
+    
+    int NumFrames;
+    if (CamIRaHeader.SelectFrames <= 10) {
+        NumFrames = CamIRaHeader.NumFrames1;
+    }
+    else {
+        NumFrames = CamIRaHeader.NumFrames2;
+    }
+    if (NumFrames > 32767 || CamIRaHeader.PixelSize > 2) {
+        fclose(Input);
+        return -4;
+    }
+
+    // create ImageHeader
+    IMAGINGHEADER ImgHeader;
+
+    ImgHeader.Endian = (short)-1;  // PC format
+    ImgHeader.HeaderSize = (short)sizeof(IMAGINGHEADER);
+    ImgHeader.ID = (short)0xaaaa;
+    ImgHeader.Version = (short)1;
+    ImgHeader.NumFrames = (short)NumFrames;
+    ImgHeader.PixelSize = CamIRaHeader.PixelSize;
+    ImgHeader.Xsize = CamIRaHeader.Xsize;
+    ImgHeader.Ysize = CamIRaHeader.Ysize;
+    ImgHeader.Padding[0] = 0;
+    ImgHeader.Padding[1] = 0;
+    ImgHeader.Padding[2] = 0;
+    ImgHeader.Padding[3] = 0;
+    ImgHeader.Padding[4] = 0;
+    ImgHeader.Padding[5] = 0;
+
+    // open output file
+    ErrNum = _wfopen_s(&Output, OutputFilename, L"wb");
+    if (Output == NULL) {
+        fclose(Input);
+        return -2;
+    }
+
+    // write ImageHeader
+    fwrite(&ImgHeader, sizeof(ImgHeader), 1, Output);
+
+    // copy Input file to output file
+    for (int Frame = 0; Frame < NumFrames; Frame++) {
+        for (int y = 0; y < ImgHeader.Ysize; y++) {
+            for (int x = 0; x < ImgHeader.Xsize; x++) {
+                if (ImgHeader.PixelSize == 1) {
+                    BYTE Pixel;
+                    iRes = fread(&Pixel, 1, 1, Input);
+                    if (iRes != 1) {
+                        fclose(Input);
+                        fclose(Output);
+                        return -4;
+                    }
+                    fwrite(&Pixel, 1, 1, Output);
+                }
+                else {
+                    short Pixel;
+                    iRes = fread(&Pixel, 2, 1, Input);
+                    if (iRes != 1) {
+                        fclose(Input);
+                        fclose(Output);
+                        return -4;
+                    }
+                    fwrite(&Pixel, 2, 1, Output);
+                }
+            }
+        }
+    }
+    fclose(Output);
+    fclose(Input);
     return 1;
 }

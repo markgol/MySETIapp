@@ -30,6 +30,8 @@
 //                      onto the output filename.
 // V1.2.1.1 2023-09-06  Corrected ImageDlg to display results file only once.
 // V1.2.2.1 2023-09-06  Changed default folders\filenames
+// V1.2.4.1 2023-09-xx  Added Add/Subtract constant from images
+//                      Changed Sum images to Add/Subtract images
 //
 // Imaging tools dialog box handlers
 // 
@@ -2156,7 +2158,22 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT2, InputFile2, MAX_PATH);
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
 
-            AddImages(hDlg, InputFile, InputFile2, OutputFile);
+            AddSubtractImages(hDlg, InputFile, InputFile2, OutputFile,TRUE);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_SUBTRACT:
+        {
+            WCHAR InputFile[MAX_PATH];
+            WCHAR InputFile2[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT2, InputFile2, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+
+            AddSubtractImages(hDlg, InputFile, InputFile2, OutputFile, FALSE);
 
             return (INT_PTR)TRUE;
         }
@@ -2608,7 +2625,7 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             int iRes;
             iRes = ResizeImage(InputFile, OutputFile, Xsize, Ysize, PixelSize);
             if (iRes != 1) {
-                MessageBox(hDlg, L"Error writing new image file", L"File I/O error", MB_OK);
+                MessageMySETIappError(hDlg, iRes, L"Resize image error");
             }
             return (INT_PTR)TRUE;
         }
@@ -2787,8 +2804,8 @@ INT_PTR CALLBACK DecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
                 MessageBox(hDlg, L"Problem with decimation kernel, check formatting", L"File incompatible", MB_OK);
                 return (INT_PTR)TRUE;
             }
-            MessageBox(hDlg, L"Error, could not process", L"I/O error", MB_OK);
-
+            MessageMySETIappError(hDlg, iRes, L"Add/Subtract constant error");
+            
             return (INT_PTR)TRUE;
         }
 
@@ -2820,3 +2837,137 @@ INT_PTR CALLBACK DecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
     return (INT_PTR)FALSE;
 }
 
+//*******************************************************************************
+//
+// Message handler for AddConstantDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK AddConstantDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        IMAGINGHEADER ImageHeader;
+
+        GetPrivateProfileString(L"AddConstantDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"AddConstantDlg", L"ImageOutput", L"Result.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        GetPrivateProfileString(L"AddConstantDlg", L"Value", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_VALUE, szString);
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_ADD:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int Value;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+            Value = GetDlgItemInt(hDlg, IDC_VALUE, &bSuccess, TRUE);
+
+            int iRes;
+            iRes = AddConstant2Image(InputFile, OutputFile, Value);
+            if (iRes != 1) {
+                MessageMySETIappError(hDlg,iRes,L"Add/Subtract constant error");
+            }
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"AddConstantDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"AddConstantDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_FOLD_NUMBER, szString, MAX_PATH);
+            WritePrivateProfileString(L"AddConstantDlg", L"Value", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
