@@ -42,8 +42,9 @@
 //                      reorder kernels to be used.  Each kernel adds an index number
 //                      onto the output filename.
 // V1.2.1.1 2023-09-06	Decimation process, corrected incorrect calculation for new Y dimension
-// V1.2.4.1 2023-09-xx	Added Add/Subtract constant from images
+// V1.2.4.1 2023-09-09	Added Add/Subtract constant from images
 //						Changed Sum images to add/subtract images
+// V1.2.5.1 2023-09-09  Added stanard image decimation (summation)
 //
 #include "framework.h"
 #include "stdio.h"
@@ -3144,7 +3145,7 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 // decimation kernel
 // The # of pixels decimated in each row in the kernel must be the same
 // with the exception if the entire row is decimated.  Then the entire row is deleted
-// exmaple:
+// example:
 // 2,2
 // 0 0
 // 0 1
@@ -3309,7 +3310,6 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 	//write output image
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
-		delete[] InputImage;
 		return -2;
 	}
 
@@ -3321,6 +3321,131 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 		if (ScalePixel && (Pixel.Long > 1)) {
 			Pixel.Long = 255;
 		}
+		if (ImageHeader.PixelSize == 1) {
+			if (Pixel.Long > 255) Pixel.Long = 255;
+			fwrite(&Pixel.Byte, 1, 1, Out);
+		}
+		else if (ImageHeader.PixelSize == 2) {
+			if (Pixel.Long > 65535) Pixel.Long = 65535;
+			fwrite(&Pixel.Short, 2, 1, Out);
+		}
+		else {
+			fwrite(&Pixel.Long, 4, 1, Out);
+		}
+	}
+
+	fclose(Out);
+	delete[] OutputImage;
+
+	if (DisplayResults) {
+		DisplayImage(OutputFile);
+	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
+// StdDecimateImage
+// 
+// This copies an image file in one size romat to a new size format
+// Limitations:
+// Xsize and Ysize of input image must be divisible by the X,Y decimate size
+// example:
+// 2,2
+// 0 0
+// 0 1
+// This deletes every even numbered pixel in a row
+// and every even numbered row
+// 
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* InputFile		input image file
+//	WCHAR* OutputFile		Resized image file
+//	int Xdecimate
+//  int Ydecimate
+// 
+//  return value:
+//  1 - Success
+//  !=1 Error see standardized app error list at top of this source file
+//
+//*******************************************************************************
+int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile,
+						int Xsize, int Ysize, int PixelSize)
+{
+	int* InputImage;
+	int* OutputImage;
+	IMAGINGHEADER ImageHeader;
+	errno_t ErrNum;
+	PIXEL Pixel;
+	FILE* Out;
+	int iRes;
+	if (Xsize <= 0 || Ysize <= 0) {
+		return 0;
+	}
+
+	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
+	if (iRes != 1) {
+		delete[]InputImage;
+		return iRes;
+	}
+
+	if ((ImageHeader.Xsize % Xsize) != 0 && (ImageHeader.Ysize % Ysize) != 0) {
+		// x,y images size must be divisible by x,y decimate size
+		return 0;
+	}
+
+	int OutXsize;
+	int OutYsize;
+
+	OutXsize = ImageHeader.Xsize / Xsize;
+	OutYsize = ImageHeader.Ysize / Ysize;
+
+	// Apply decimation kernel
+	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize * (size_t)ImageHeader.NumFrames];
+	if (OutputImage == NULL) {
+		delete[] InputImage;
+		return -1;
+	}
+
+	int PixelSum;
+	int Address;
+	int AddressOut;
+
+	for (int FrameNum = 0; FrameNum < ImageHeader.NumFrames; FrameNum++) {
+		for (int y = 0, yout = 0; y < ImageHeader.Ysize; y = y + Ysize, yout++) {
+			for (int x = 0, xout = 0; x < ImageHeader.Xsize; x = x + Xsize, xout++) {
+				PixelSum = 0;
+				for (int i = 0; i < Ysize; i++) {
+					for (int j = 0; j < Xsize; j++) {
+						Address = (x + j) + (ImageHeader.Xsize * (y + i)) + (FrameNum * ImageHeader.Xsize * ImageHeader.Ysize);
+						PixelSum = PixelSum + InputImage[Address];
+					}
+				}
+				AddressOut = xout + (yout * OutXsize) + (FrameNum * OutXsize * OutYsize);
+				OutputImage[AddressOut] = PixelSum;
+			}
+		}
+	}
+
+	delete[] InputImage;
+
+	// update header
+	ImageHeader.Xsize = OutXsize;
+	ImageHeader.Ysize = OutYsize;
+	ImageHeader.PixelSize = PixelSize;
+
+	//write output image
+	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+	if (Out == NULL) {
+		return -2;
+	}
+
+	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
+
+	// write image
+	for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize * ImageHeader.NumFrames); i++) {
+		Pixel.Long = OutputImage[i];
 		if (ImageHeader.PixelSize == 1) {
 			if (Pixel.Long > 255) Pixel.Long = 255;
 			fwrite(&Pixel.Byte, 1, 1, Out);

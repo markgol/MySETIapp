@@ -79,4 +79,6 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 
 int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int ScalePixel);
 
+int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize);
+
 int AddConstant2Image(WCHAR *InputFile, WCHAR *OutputFile, int Value);

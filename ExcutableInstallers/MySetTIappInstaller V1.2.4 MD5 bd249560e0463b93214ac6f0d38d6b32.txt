@@ -1,2 +1,2 @@
-The MD5 has for the V1.2.1.1 MySETIapp is:
+The MD5 has for the V1.2.4.1 MySETIapp is:
 bd249560e0463b93214ac6f0d38d6b32

@@ -79,10 +79,13 @@
 //                      Removed Autosize flag from settings.
 //                      Corrected bug introduced in V1.2.1 where incorrect frame size
 //                      was used in the ImportBMP function.
-// V1.2.4.1 2023-09-xx  Added Add/Subtract a constant from entire image
+// V1.2.4.1 2023-09-09  Added Add/Subtract a constant from entire image
 //                      Changed Sum images to Add/Subtract images
 //                      Added import of CamIRa IMG files (not applicable to A Sign in Space project)
 //                      Cleanup of file open/save dialogs
+// V1.2.5.1 2023-09-09  Changed handling of default directories
+//                      Aded standard image decimation (summation of pixels)
+//                      Corected tab order and default buttons in all dialogs
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -178,6 +181,7 @@ INT_PTR CALLBACK    GlobalSettingsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Text2StreamDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    AddConstantDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    StdDecimationDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -311,8 +315,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    // load globals
    hwndMain = hWnd;
    WCHAR szString[MAX_PATH];
-   GetPrivateProfileString(L"GlobalSettings", L"BMPresults", szBMPFilename, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+   GetPrivateProfileString(L"GlobalSettings", L"BMPresults", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
    wcscpy_s(szBMPFilename, szString);
+
+   GetPrivateProfileString(L"GlobalSettings", L"CurrentFIlename", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+   wcscpy_s(szCurrentFilename, szString);
 
    DisplayResults = GetPrivateProfileInt(L"GlobalSettings", L"DisplayResults", 0, (LPCTSTR)strAppNameINI);
    AutoScaleResults = GetPrivateProfileInt(L"GlobalSettings", L"AutoScaleResults", 0, (LPCTSTR)strAppNameINI);
@@ -535,6 +542,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_DECIMATION), hWnd, DecimationDlg);
                 break;
 
+            case IDM_IMAGETOOLS_STDECIMATION:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_STDDECIMATION), hWnd, StdDecimationDlg);
+                break;
+
             case IDM_IMAGETOOLS_RESIZE:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_RESIZE), hWnd, ResizeDlg);
                 break;
@@ -566,6 +577,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         {   // save window position/size data
             CString csString = L"MainWindow";
+            WritePrivateProfileString(L"GlobalSettings", L"CurrentFIlename", szCurrentFilename, (LPCTSTR)strAppNameINI);
             SaveWindowPlacement(hWnd, csString);
         }
         PostQuitMessage(0);

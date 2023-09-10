@@ -50,8 +50,9 @@
 // V1.2.2.1 2023-09-06  Path must exist check is done on selected files in dialogs.
 //                      Corrected bug introduced in V1.2.1 where incorrect frame size
 //                      was used in the ImportBMP function.
-// V1.2.4.1 2023-09-xx  Added import CamIRa IMG file
+// V1.2.4.1 2023-09-09  Added import CamIRa IMG file
 //                      Clean up of file open/save filename handling
+// V1.2.5.1 2023-09-09  Updated default directory handling
 //
 #include "framework.h"
 #include "resource.h"
@@ -107,7 +108,7 @@ if (SUCCEEDED(hr))
 
     if (SUCCEEDED(hr))
     {
-        if (wcscmp(pszCurrentFilename, L"") != 0) {
+         if (wcscmp(pszCurrentFilename, L"") != 0) {
             //parse for just filename
             int err;
             WCHAR Drive[_MAX_DRIVE];
@@ -128,10 +129,39 @@ if (SUCCEEDED(hr))
                 return FALSE;
             }
 
+            // if no directory try the global CurrentFilename for directory
+            if (wcscmp(Directory, L"") == 0) {
+                err = _wsplitpath_s(szCurrentFilename, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                    _MAX_FNAME, Ext, _MAX_EXT);
+                if (err != 0) {
+                    return FALSE;
+                }
+
+                err = _wmakepath_s(Directory, _MAX_PATH, Drive, Dir, L"", L"");
+                if (err != 0) {
+                    return FALSE;
+                }
+            }
+
+            // if still no directory try the global strAppNameEXE for directory
+            if (wcscmp(Directory, L"") == 0) {
+                err = _wsplitpath_s(strAppNameEXE, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                    _MAX_FNAME, Ext, _MAX_EXT);
+                if (err != 0) {
+                    return FALSE;
+                }
+
+                err = _wmakepath_s(Directory, _MAX_PATH, Drive, Dir, L"", L"");
+                if (err != 0) {
+                    return FALSE;
+                }
+            }
+
             IShellItem* pCurFolder = NULL;
             hr = SHCreateItemFromParsingName(Directory, NULL, IID_PPV_ARGS(&pCurFolder));
             if (SUCCEEDED(hr)) {
                 hr = pFileOpen->SetFolder(pCurFolder);
+                hr = pFileOpen->SetDefaultFolder(pCurFolder);
                 pCurFolder->Release();
             }
         }
@@ -266,11 +296,39 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
                 if (err != 0) {
                     return FALSE;
                 }
+                // if no directory try the global CurrentFilename for directory
+                if (wcscmp(Directory, L"") == 0) {
+                    err = _wsplitpath_s(szCurrentFilename, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                        _MAX_FNAME, Ext, _MAX_EXT);
+                    if (err != 0) {
+                        return FALSE;
+                    }
+
+                    err = _wmakepath_s(Directory, _MAX_PATH, Drive, Dir, L"", L"");
+                    if (err != 0) {
+                        return FALSE;
+                    }
+                }
+
+                // if still no directory try the global strAppNameEXE for directory
+                if (wcscmp(Directory, L"") == 0) {
+                    err = _wsplitpath_s(strAppNameEXE, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                        _MAX_FNAME, Ext, _MAX_EXT);
+                    if (err != 0) {
+                        return FALSE;
+                    }
+
+                    err = _wmakepath_s(Directory, _MAX_PATH, Drive, Dir, L"", L"");
+                    if (err != 0) {
+                        return FALSE;
+                    }
+                }
 
                 IShellItem* pCurFolder = NULL;
                 hr = SHCreateItemFromParsingName(Directory, NULL, IID_PPV_ARGS(&pCurFolder));
                 if (SUCCEEDED(hr)) {
                     hr = pFileSave->SetFolder(pCurFolder);
+                    hr = pFileSave->SetDefaultFolder(pCurFolder);
                     pCurFolder->Release();
                 }
             }
@@ -753,7 +811,8 @@ void ExportFile(HWND hWnd, int wmId)
          { L"All Files", L"*.*" },
     };
 
-    if (!CCFileOpen(hWnd, (LPWSTR)L"", &pszFilename, FALSE, 2, RawType, L".raw")) {
+    GetPrivateProfileString(L"ExportFile", L"InputFile", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+    if (!CCFileOpen(hWnd, szString, &pszFilename, FALSE, 2, RawType, L".raw")) {
         return;
     }
     wcscpy_s(InputFile, pszFilename);
@@ -793,18 +852,25 @@ void ExportFile(HWND hWnd, int wmId)
             AutoScale = 1;
         }
     }
+    WritePrivateProfileString(L"ExportFile", L"InputFile", InputFile, (LPCTSTR)strAppNameINI);
 
     if (wmId == IDM_FILE_TOBMP) {
+
+        GetPrivateProfileString(L"ExportFile", L"BMPFile", L"Message.bmp", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         COMDLG_FILTERSPEC BMPType[] =
         {
              { L"BMP files", L"*.bmp" },
              { L"All Files", L"*.*" },
         };
-        if (!CCFileSave(hWnd, (LPWSTR) L"", &pszFilename, FALSE, 2, BMPType, L".bmp")) {
+        if (!CCFileSave(hWnd, szString, &pszFilename, FALSE, 2, BMPType, L".bmp")) {
             return;
         }
+        WritePrivateProfileString(L"ExportFile", L"BMPFile", pszFilename, (LPCTSTR)strAppNameINI);
+
     }
     else if (wmId == IDM_FILE_TOTXT) {
+        GetPrivateProfileString(L"ExportFile", L"TextFile", L"Message.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+
         COMDLG_FILTERSPEC TXTType[] =
         {
              { L"Image files", L"*.txt" },
@@ -813,6 +879,8 @@ void ExportFile(HWND hWnd, int wmId)
         if (!CCFileSave(hWnd, (LPWSTR)L"", &pszFilename, FALSE, 2, TXTType, L".txt")) {
             return;
         }
+        WritePrivateProfileString(L"ExportFile", L"TextFile", pszFilename, (LPCTSTR)strAppNameINI);
+
     }
 
     wcscpy_s(szString, pszFilename);
@@ -821,6 +889,7 @@ void ExportFile(HWND hWnd, int wmId)
     // convert to file
     if (wmId == IDM_FILE_TOBMP) {
         SaveBMP(szString, InputFile,RGBframes, AutoScale);
+        wcscpy_s(szCurrentFilename, szString);
     }
     else if (wmId == IDM_FILE_TOTXT) {
         SaveTXT(szString, InputFile);
@@ -1659,6 +1728,8 @@ int ImportBMP(HWND hWnd)
     fclose(ImgFile);
     delete[] Image;
 
+    wcscpy_s(szCurrentFilename, OutputFilename);
+
     if (DisplayResults) {
         DisplayImage(OutputFilename);
     }
@@ -1887,6 +1958,7 @@ int CamIRaImport(HWND hWnd)
             }
         }
     }
+    wcscpy_s(szCurrentFilename, OutputFilename);
     fclose(Output);
     fclose(Input);
     return 1;

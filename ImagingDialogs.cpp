@@ -30,9 +30,10 @@
 //                      onto the output filename.
 // V1.2.1.1 2023-09-06  Corrected ImageDlg to display results file only once.
 // V1.2.2.1 2023-09-06  Changed default folders\filenames
-// V1.2.4.1 2023-09-xx  Added Add/Subtract constant from images
+// V1.2.4.1 2023-09-09  Added Add/Subtract constant from images
 //                      Changed Sum images to Add/Subtract images
-//
+// V1.2.5.1 2023-09-09  Added stanard image decimation (summation)
+// 
 // Imaging tools dialog box handlers
 // 
 // New dialogs for the image tools menu should be added to this module.
@@ -311,7 +312,8 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
                 ScaleBinary, SubimageXloc, SubimageYloc, StartFrame, EndFrame,
                 SubimageXsize, SubimageYsize,
                 OutputXsize, OutputYsize, Centered);
-            
+
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -523,7 +525,7 @@ INT_PTR CALLBACK AppendEndImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             }
 
             ImageAppendEnd(hDlg, InputFile, InputFile2, OutputFile, IncrFrames);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -690,7 +692,7 @@ INT_PTR CALLBACK AppendRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
 
             ImageAppendRight(hDlg, InputFile, InputFile2, OutputFile);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -896,7 +898,7 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             }
 
             PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, FALSE, EnableBatch, GenerateBMP);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -1047,7 +1049,7 @@ INT_PTR CALLBACK FoldLeftImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             FoldColumn = GetDlgItemInt(hDlg, IDC_FOLD_NUMBER, &bSuccess, TRUE);
 
             FoldImageLeft(hDlg, InputFile, OutputFile, FoldColumn);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -1179,7 +1181,7 @@ INT_PTR CALLBACK FoldRightImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             FoldColumn = GetDlgItemInt(hDlg, IDC_FOLD_NUMBER, &bSuccess, TRUE);
 
             FoldImageRight(hDlg, InputFile, OutputFile, FoldColumn);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -1311,7 +1313,7 @@ INT_PTR CALLBACK FoldDownImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             FoldRow = GetDlgItemInt(hDlg, IDC_FOLD_NUMBER, &bSuccess, TRUE);
             
             FoldImageDown(hDlg, InputFile, OutputFile, FoldRow);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -1443,7 +1445,7 @@ INT_PTR CALLBACK FoldUpImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             FoldRow = GetDlgItemInt(hDlg, IDC_FOLD_NUMBER, &bSuccess, TRUE);
             
             FoldImageUp(hDlg, InputFile, OutputFile, FoldRow);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -1574,7 +1576,7 @@ INT_PTR CALLBACK LeftAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
             AccordionSize = GetDlgItemInt(hDlg, IDC_FOLD_NUMBER, &bSuccess, TRUE);
             AccordionImageLeft(hDlg, InputFile, OutputFile, AccordionSize);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -1705,7 +1707,7 @@ INT_PTR CALLBACK RightAccordionImageDlg(HWND hDlg, UINT message, WPARAM wParam, 
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
             AccordionSize = GetDlgItemInt(hDlg, IDC_FOLD_NUMBER, &bSuccess, TRUE);
             AccordionImageRight(hDlg, InputFile, OutputFile, AccordionSize);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -1830,7 +1832,7 @@ INT_PTR CALLBACK LeftShiftRowsImageDlg(HWND hDlg, UINT message, WPARAM wParam, L
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
             LeftShiftImage(hDlg, InputFile, OutputFile);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -1980,7 +1982,7 @@ INT_PTR CALLBACK ConvolutionImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPA
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
             
             ConvolveImage(hDlg, TextInput, InputFile, OutputFile);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -2159,7 +2161,7 @@ INT_PTR CALLBACK AddImagesImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
 
             AddSubtractImages(hDlg, InputFile, InputFile2, OutputFile,TRUE);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -2316,7 +2318,7 @@ INT_PTR CALLBACK MirrorDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             }
 
             MirrorImage(hDlg, InputFile, OutputFile, Direction);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -2461,7 +2463,7 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 
 
             RotateImage(hDlg, InputFile, OutputFile, Direction);
-
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -2523,15 +2525,15 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
         GetPrivateProfileString(L"ResizeDlg", L"ImageOutput", L"Resized.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
-        GetDlgItemText(hDlg, IDC_XSIZEI, szString, MAX_PATH);
+        GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
         GetPrivateProfileString(L"ResizeDlg", L"Xsize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_XSIZE, szString);
 
-        GetDlgItemText(hDlg, IDC_YSIZEI, szString, MAX_PATH);
+        GetDlgItemText(hDlg, IDC_YSIZE, szString, MAX_PATH);
         GetPrivateProfileString(L"ResizeDlg", L"Ysize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_YSIZE, szString);
 
-        GetDlgItemText(hDlg, IDC_PIXEL_SIZEI, szString, MAX_PATH);
+        GetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString, MAX_PATH);
         GetPrivateProfileString(L"ResizeDlg", L"PixelSize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString);
 
@@ -2601,21 +2603,13 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             WCHAR InputFile[MAX_PATH];
             WCHAR OutputFile[MAX_PATH];
             int Xsize,Ysize;
-            int XsizeI, YsizeI;
             int PixelSize;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
             Xsize = GetDlgItemInt(hDlg, IDC_XSIZE, &bSuccess, TRUE);
             Ysize = GetDlgItemInt(hDlg, IDC_YSIZE, &bSuccess, TRUE);
-            XsizeI = GetDlgItemInt(hDlg, IDC_XSIZEI, &bSuccess, TRUE);
-            YsizeI = GetDlgItemInt(hDlg, IDC_YSIZEI, &bSuccess, TRUE);
             PixelSize = GetDlgItemInt(hDlg, IDC_PIXEL_SIZE, &bSuccess, TRUE);
-
-            if ((Xsize * Ysize) != (XsizeI * YsizeI)) {
-                MessageBox(hDlg, L"New Xsize*Ysize must equal old Xsize*Ysize", L"Bad entry", MB_OK);
-                return (INT_PTR)TRUE;
-            }
 
             if (PixelSize!=1 && PixelSize!=2 && PixelSize!=4) {
                 MessageBox(hDlg, L"Pixel size must be 1, 2, or 4", L"Bad entry", MB_OK);
@@ -2627,6 +2621,7 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
             if (iRes != 1) {
                 MessageMySETIappError(hDlg, iRes, L"Resize image error");
             }
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 
@@ -2645,6 +2640,164 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 
             GetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString, MAX_PATH);
             WritePrivateProfileString(L"ResizeDlg", L"PixelSize", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
+// Message handler for StdDecimationDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK StdDecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        IMAGINGHEADER ImageHeader;
+
+        GetPrivateProfileString(L"StdDecimationDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, ImageHeader.PixelSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"StdDecimationDlg", L"ImageOutput", L"Decimated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        GetPrivateProfileString(L"StdDecimationDlg", L"Xdecimate", L"2", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XDECIMATE, szString);
+
+        GetPrivateProfileString(L"StdDecimationDlg", L"Ydecimate", L"2", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YDECIMATE, szString);
+
+        GetPrivateProfileString(L"StdDecimationDlg", L"PixelSize", L"1", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString);
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_DECIMATE:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int Xsize, Ysize;
+            int PixelSize;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+            Xsize = GetDlgItemInt(hDlg, IDC_XDECIMATE, &bSuccess, TRUE);
+            Ysize = GetDlgItemInt(hDlg, IDC_YDECIMATE, &bSuccess, TRUE);
+            PixelSize = GetDlgItemInt(hDlg, IDC_PIXEL_SIZE, &bSuccess, TRUE);
+
+            if (PixelSize != 1 && PixelSize != 2 && PixelSize != 4) {
+                MessageBox(hDlg, L"Pixel size must be 1, 2, or 4", L"Bad entry", MB_OK);
+                return (INT_PTR)TRUE;
+            }
+
+            int iRes;
+            iRes = StdDecimateImage(InputFile, OutputFile, Xsize, Ysize, PixelSize);
+            if (iRes != 1) {
+                MessageMySETIappError(hDlg, iRes, L"Resize image error");
+            }
+            wcscpy_s(szCurrentFilename, OutputFile);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"StdDecimationDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"StdDecimationDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XDECIMATE, szString, MAX_PATH);
+            WritePrivateProfileString(L"StdDecimationDlg", L"Xdecimate", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YDECIMATE, szString, MAX_PATH);
+            WritePrivateProfileString(L"StdDecimationDlg", L"Ydecimate", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"StdDecimationDlg", L"PixelSize", szString, (LPCTSTR)strAppNameINI);
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
@@ -2798,6 +2951,7 @@ INT_PTR CALLBACK DecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             int iRes;
             iRes = DecimateImage(InputFile, TextInput, OutputFile, ScalePixel);
             if (iRes == 1) {
+                wcscpy_s(szCurrentFilename, OutputFile);
                 return (INT_PTR)TRUE;
             }
             if (iRes == 0 || iRes==-3) {
@@ -2948,6 +3102,7 @@ INT_PTR CALLBACK AddConstantDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             if (iRes != 1) {
                 MessageMySETIappError(hDlg,iRes,L"Add/Subtract constant error");
             }
+            wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
 

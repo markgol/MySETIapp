@@ -24,7 +24,7 @@
 // V1.1.0.1 2023-08-22  Added file type specifications to open/save dialogs
 // V1.2.0.1 2023-08-31  Added text to packed bit stream file
 // V1.2.2.1 2023-09-06  Changed default folders\filenames
-// V1.2.4.1 2023-09-xx  Added a batch mode for bitstream to image file
+// V1.2.4.1 2023-09-09  Added a batch mode for bitstream to image file
 //
 // Bit tools dialog box handlers
 // 
@@ -1082,16 +1082,14 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
                 BitStream2Image(hDlg, InputFile, OutputFile,
                     PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize,
                     BitDepth, BitOrder, BitScale);
+
+                wcscpy_s(szCurrentFilename, OutputFile);
             }
             else {
                 BatchBitStream2Image(hDlg, InputFile, OutputFile,
                     PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize, xsizeEnd,
                     BitDepth, BitOrder, BitScale);
             }
-            
-            // save output filename in global
-            wcscpy_s(szCurrentFilename, OutputFile);
-
             return (INT_PTR)TRUE;
         }
 
