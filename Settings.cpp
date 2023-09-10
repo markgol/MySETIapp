@@ -23,6 +23,8 @@
 // V1.2.2.1 2023-09-10  Changed default folders\filenames
 //                      Changed default settings for app -> display last results, autoscale, RGB display for 3 frame files
 //                      Removed Autosize flag from settings.
+// V1.2.5.1 2023-09-09  Display .exe and .ini file locations in the settings dialog.
+//                      The .ini location is always the same folder as the executable.
 //
 // Global Settings dialog box handler
 // 
@@ -55,6 +57,9 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
         int iRes;
         GetPrivateProfileString(L"GlobalSettings", L"BMPresults", L"BMP files\\last.bmp", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BMP_RESULTS, szString);
+        
+        SetDlgItemText(hDlg, IDC_INI_FILE, strAppNameINI);
+        SetDlgItemText(hDlg, IDC_EXE_FILE, strAppNameEXE);
 
         //IDC_SETTINGS_DISPLAY_RESULTS
         iRes = GetPrivateProfileInt(L"GlobalSettings", L"DisplayResults", 1, (LPCTSTR)strAppNameINI);

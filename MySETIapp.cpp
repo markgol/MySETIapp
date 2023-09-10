@@ -86,6 +86,8 @@
 // V1.2.5.1 2023-09-09  Changed handling of default directories
 //                      Aded standard image decimation (summation of pixels)
 //                      Corected tab order and default buttons in all dialogs
+//                      Display .exe and .ini file locations in the settings dialog.
+//                      The .ini location is always the same folder as the executable.
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //

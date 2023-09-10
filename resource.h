@@ -113,6 +113,9 @@
 #define IDC_XSIZE_END                   1042
 #define IDC_XDECIMATE                   1043
 #define IDC_YDECIMATE                   1044
+#define IDC_INI_FILE                    1045
+#define IDC_INI_FILE2                   1046
+#define IDC_EXE_FILE                    1046
 #define IDC_REORDER                     1074
 #define IDC_IMAGE_INPUT_BROWSE          1077
 #define IDC_IMAGE_INPUT                 1078
@@ -182,7 +185,7 @@
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        138
 #define _APS_NEXT_COMMAND_VALUE         32877
-#define _APS_NEXT_CONTROL_VALUE         1045
+#define _APS_NEXT_CONTROL_VALUE         1046
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif
