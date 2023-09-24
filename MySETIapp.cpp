@@ -88,6 +88,16 @@
 //                      Corected tab order and default buttons in all dialogs
 //                      Display .exe and .ini file locations in the settings dialog.
 //                      The .ini location is always the same folder as the executable.
+// V1.2.6.1 2023-09-24  Correction, Display Image/BMP file was not displaying BMP file
+//                      Changed, display of 16, 32 bit image data, using scaled BMP file.
+//                      The BMP file is still only a 8bpp file. (not applicable to A Sign in Space project)
+//                      Added Algorithm driven reordering (onyl 5 algorithms to start)
+//                      Added Increase image size by replication.
+//                      Changed HEX dump, added skip bytes from start of file
+//                      Added extract block symbols from image file
+//                      (save as 2D image file, right padded with null symbols)
+//                      Added temp image filename to app settings.  For use in debugging
+//                      functions by saving intermediate results.
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -105,7 +115,6 @@
 // The functions that actually perform the actions should be put in
 // bitstream.cpp and bitstream.h
 //
-
 #include "framework.h"
 #include <atlstr.h>
 #include <strsafe.h>
@@ -124,6 +133,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
 WCHAR szBMPFilename[MAX_PATH] = L"";    // used to save last results file
 WCHAR szCurrentFilename[MAX_PATH] = L"";    // used to save last results file
+WCHAR szTempImageFilename[MAX_PATH] = L"";    // used as a temporary image file for processing
 int DisplayResults = 0;
 int AutoScaleResults = 0;
 int DefaultRBG = 0;
@@ -162,6 +172,7 @@ INT_PTR CALLBACK    BitSequencesDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    BitStatsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    BitReorderDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    BitImageDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    ExtractSymbolsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ExtractImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    AppendEndImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    AppendRightImageDlg(HWND, UINT, WPARAM, LPARAM);
@@ -184,6 +195,8 @@ INT_PTR CALLBACK    ImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Text2StreamDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    AddConstantDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    StdDecimationDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    ReplicationDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    ReorderAlgDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -319,6 +332,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    WCHAR szString[MAX_PATH];
    GetPrivateProfileString(L"GlobalSettings", L"BMPresults", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
    wcscpy_s(szBMPFilename, szString);
+
+   GetPrivateProfileString(L"GlobalSettings", L"TempImageFilename", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+   wcscpy_s(szTempImageFilename, szString);
 
    GetPrivateProfileString(L"GlobalSettings", L"CurrentFIlename", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
    wcscpy_s(szCurrentFilename, szString);
@@ -458,6 +474,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_BITTOOLS_BINARYIMAGE:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_BINARYIMAGE), hWnd, BitImageDlg);
                 break;
+                
+            case IDM_BITTOOLS_EXTRACT_PACKETS:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_EXTRACT_SYMBOLS), hWnd, ExtractSymbolsDlg);
+                break;
 
             // Image tools menu
             case IDM_IMGTOOLS_PROPERTIES:
@@ -496,6 +516,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_REORDER), hWnd, ReorderImageDlg);
                 break;
 
+            case IDM_IMAGETOOLS_REORDER_ALG:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_REORDER_ALG), hWnd, ReorderAlgDlg);
+                break;
+                    
             case IDM_FOLDING_FOLDLEFT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_FOLDLEFT), hWnd, FoldLeftImageDlg);
                 break;
@@ -554,6 +578,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case IDM_ADDSUBTRACT_CONSTANT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_ADD_CONSTANT), hWnd, AddConstantDlg);
+                break;
+                
+            case IDM_IMAGETOOLS_REPLICATION:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_REPLICATION), hWnd, ReplicationDlg);
                 break;
 
             case IDM_SETTINGS:

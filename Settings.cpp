@@ -25,6 +25,8 @@
 //                      Removed Autosize flag from settings.
 // V1.2.5.1 2023-09-09  Display .exe and .ini file locations in the settings dialog.
 //                      The .ini location is always the same folder as the executable.
+// V1.2.6.1 2023-09-24  Added temp image filename to app settings.  For use in debugging
+//                      functions by saving intermediate results.
 //
 // Global Settings dialog box handler
 // 
@@ -57,7 +59,10 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
         int iRes;
         GetPrivateProfileString(L"GlobalSettings", L"BMPresults", L"BMP files\\last.bmp", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BMP_RESULTS, szString);
-        
+
+        GetPrivateProfileString(L"GlobalSettings", L"TempImageFilename", L"working.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMG_TEMP, szString);
+
         SetDlgItemText(hDlg, IDC_INI_FILE, strAppNameINI);
         SetDlgItemText(hDlg, IDC_EXE_FILE, strAppNameEXE);
 
@@ -87,13 +92,13 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
         case IDC_BMP_RESULTS_BROWSE:
         {
             PWSTR pszFilename;
-            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_BMP_RESULTS, szString, MAX_PATH);
             COMDLG_FILTERSPEC BMPType[] =
             {
                  { L"BMP files", L"*.bmp" },
                  { L"All Files", L"*.*" },
             };
-            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, BMPType, L".bmp")) {
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, BMPType, L".bmp")) {
                 return (INT_PTR)TRUE;
             }
             {
@@ -105,10 +110,35 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             return (INT_PTR)TRUE;
         }
 
+        case IDC_IMG_TEMP_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMG_TEMP, szString, MAX_PATH);
+            COMDLG_FILTERSPEC imgType[] =
+            {
+                 { L"Image Files", L" * .raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, imgType, L".raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMG_TEMP, szString);
+
+            return (INT_PTR)TRUE;
+        }
+
         case IDOK:
             GetDlgItemText(hDlg, IDC_BMP_RESULTS, szString, MAX_PATH);
             wcscpy_s(szBMPFilename, szString);
             WritePrivateProfileString(L"GlobalSettings", L"BMPresults", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMG_TEMP, szString, MAX_PATH);
+            wcscpy_s(szTempImageFilename, szString);
+            WritePrivateProfileString(L"GlobalSettings", L"TempImageFilename", szString, (LPCTSTR)strAppNameINI);
 
             //IDC_SETTINGS_DISPLAY_RESULTS
             if (IsDlgButtonChecked(hDlg, IDC_SETTINGS_DISPLAY_RESULTS) == BST_CHECKED) {

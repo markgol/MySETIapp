@@ -25,6 +25,7 @@
 // V1.2.0.1 2023-08-31  Added text to packed bit stream file
 // V1.2.2.1 2023-09-06  Changed default folders\filenames
 // V1.2.4.1 2023-09-09  Added a batch mode for bitstream to image file
+// V1.2.6.1 2023-09-24  Changed HEX dump, added skip bytes from start of file
 //
 // Bit tools dialog box handlers
 // 
@@ -72,6 +73,9 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 
         GetPrivateProfileString(L"BitHexDumpDlg", L"xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_XSIZE, szString);
+
+        GetPrivateProfileString(L"BitHexDumpDlg", L"SkipBytes", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_SKIP_BYTES, szString);
 
         return (INT_PTR)TRUE;
 
@@ -124,13 +128,15 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             WCHAR InputFile[MAX_PATH];
             WCHAR OutputFile[MAX_PATH];
             int xsize;
+            int SkipBytes;
 
             GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, OutputFile, MAX_PATH);
 
             xsize = GetDlgItemInt(hDlg, IDC_XSIZE, &bSuccess, TRUE);
+            SkipBytes = GetDlgItemInt(hDlg, IDC_SKIP_BYTES, &bSuccess, TRUE);
 
-            FileHexDump(hDlg, InputFile, OutputFile, xsize);
+            FileHexDump(hDlg, InputFile, OutputFile, xsize, SkipBytes);
             
             return (INT_PTR)TRUE;
         }
@@ -144,6 +150,9 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 
             GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
             WritePrivateProfileString(L"BitHexDumpDlg", L"xsize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_SKIP_BYTES, szString, MAX_PATH);
+            WritePrivateProfileString(L"BitHexDumpDlg", L"SkipBytes", szString, (LPCTSTR)strAppNameINI);
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;

@@ -33,6 +33,7 @@
 //
 // V1.0.0.1 2023-08-20  Initial Release
 // V1.2.0.1 2023-08-30  Added Convert text to packed bitstream file
+// V1.2.6.1 2023-09-24  Added Skip bytes to HEX dump
 //
 #include "framework.h"
 #include <windowsx.h>
@@ -465,7 +466,7 @@ void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize)
 //                      0 - will result in all values on 1 line without eol in file
 //  
 //******************************************************************************
-void FileHexDump(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int xsize)
+void FileHexDump(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int xsize, int SkipBytes)
 {
     FILE* In;
     FILE* Out;
@@ -489,6 +490,12 @@ void FileHexDump(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int xsize)
     if (Out==NULL) {
         fclose(In);
         MessageBox(hDlg, L"Could not open temp output file", L"File I/O", MB_OK);
+        return;
+    }
+
+    if (fseek(In, SkipBytes, SEEK_SET) != 0) {
+        fclose(In);
+        MessageBox(hDlg, L"bad format, file, too small", L"File I/O", MB_OK);
         return;
     }
 

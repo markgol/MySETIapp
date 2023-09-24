@@ -33,6 +33,10 @@
 // V1.2.4.1 2023-09-09  Added Add/Subtract constant from images
 //                      Changed Sum images to Add/Subtract images
 // V1.2.5.1 2023-09-09  Added stanard image decimation (summation)
+// V1.2.6.1 2023-09-24  Added Increase image size by replication.
+//                      Added Algorithm driven reordering (onyl 5 algorithms to start)
+//                      Added extract block symbols from image file
+//                      (save as 2D image file, right padded with null symbols)
 // 
 // Imaging tools dialog box handlers
 // 
@@ -2461,7 +2465,6 @@ INT_PTR CALLBACK RotateDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
                 Direction = 1;
             }
 
-
             RotateImage(hDlg, InputFile, OutputFile, Direction);
             wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
@@ -2525,16 +2528,13 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
         GetPrivateProfileString(L"ResizeDlg", L"ImageOutput", L"Resized.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
-        GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
-        GetPrivateProfileString(L"ResizeDlg", L"Xsize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ResizeDlg", L"Xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_XSIZE, szString);
 
-        GetDlgItemText(hDlg, IDC_YSIZE, szString, MAX_PATH);
-        GetPrivateProfileString(L"ResizeDlg", L"Ysize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ResizeDlg", L"Ysize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_YSIZE, szString);
 
-        GetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString, MAX_PATH);
-        GetPrivateProfileString(L"ResizeDlg", L"PixelSize", szString, szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ResizeDlg", L"PixelSize", L"1", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString);
 
         return (INT_PTR)TRUE;
@@ -2640,6 +2640,192 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 
             GetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString, MAX_PATH);
             WritePrivateProfileString(L"ResizeDlg", L"PixelSize", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
+// Message handler for ReorderAlgDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        IMAGINGHEADER ImageHeader;
+        int Algorithm;
+
+        GetPrivateProfileString(L"ReorderAlgDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, ImageHeader.PixelSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"ReorderAlgDlg", L"ImageOutput", L"ReorderedAlg.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        GetPrivateProfileString(L"ReorderAlgDlg", L"Xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XSIZE, szString);
+
+        GetPrivateProfileString(L"ReorderAlgDlg", L"Ysize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YSIZE, szString);
+
+        GetPrivateProfileString(L"ReorderAlgDlg", L"PixelSize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString);
+
+        Algorithm = GetPrivateProfileInt(L"ReorderAlgDlg", L"Algorithm", 0, (LPCTSTR)strAppNameINI);
+        // combo box with alogrithm list
+        HWND ComboHwnd;
+        ComboHwnd = GetDlgItem(hDlg, IDC_COMBO_ALG);
+        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Just resize");
+        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Quadrant UL,UR,LL,LR, left to right, top to bottom, no resize");
+        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Quadrant UL,LL,UR,LR, left to right, top to bottom, no resize");
+        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Quadrant LL,UL,LR,UR, left to right, top to bottom, no resize");
+        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Quadrant LL,LR,UL,UR, left to right, top to bottom, no resize");
+        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Quadrant UL,UR,LL,LR, center out, no resize");
+        SendMessage(ComboHwnd, CB_SETCURSEL, Algorithm, 0);
+        SendMessage(ComboHwnd, CB_SETTOPINDEX, Algorithm, 0);
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_REORDER:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int Xsize, Ysize;
+            int PixelSize;
+            int Algorithm;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+            Xsize = GetDlgItemInt(hDlg, IDC_XSIZE, &bSuccess, TRUE);
+            Ysize = GetDlgItemInt(hDlg, IDC_YSIZE, &bSuccess, TRUE);
+            PixelSize = GetDlgItemInt(hDlg, IDC_PIXEL_SIZE, &bSuccess, TRUE);
+
+            if (PixelSize != 0 && PixelSize != 1 && PixelSize != 2 && PixelSize != 4) {
+                MessageBox(hDlg, L"Pixel size must be 1, 2, or 4", L"Bad entry", MB_OK);
+                return (INT_PTR)TRUE;
+            }
+            // get currently selected algorithm from combobox
+            Algorithm = 0;
+            HWND ComboHwnd;
+
+            ComboHwnd = GetDlgItem(hDlg, IDC_COMBO_ALG);
+            Algorithm = (int) SendMessage(ComboHwnd, CB_GETCURSEL, 0, 0);
+
+            int iRes;
+            iRes = ReorderAlg(InputFile, OutputFile, Xsize, Ysize, PixelSize, Algorithm);
+            if (iRes != 1) {
+                MessageMySETIappError(hDlg, iRes, L"Algorithmic reorder image error");
+            }
+            wcscpy_s(szCurrentFilename, OutputFile);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderAlgDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderAlgDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderAlgDlg", L"Xsize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderAlgDlg", L"Ysize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderAlgDlg", L"PixelSize", szString, (LPCTSTR)strAppNameINI);
+            HWND ComboHwnd;
+            int Algorithm;
+
+            ComboHwnd = GetDlgItem(hDlg, IDC_COMBO_ALG);
+            Algorithm = (int)SendMessage(ComboHwnd, CB_GETCURSEL, 0, 0);
+
+            swprintf_s(szString, MAX_PATH, L"%d", Algorithm);
+            WritePrivateProfileString(L"ReorderAlgDlg", L"Algorithm", szString, (LPCTSTR)strAppNameINI);
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
@@ -2993,6 +3179,151 @@ INT_PTR CALLBACK DecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 
 //*******************************************************************************
 //
+// Message handler for ReplicationDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK ReplicationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        IMAGINGHEADER ImageHeader;
+
+        GetPrivateProfileString(L"ReplicationDlg", L"ImageInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, ImageHeader.PixelSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_PIXEL_SIZEI, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"ReplicationDlg", L"ImageOutput", L"replicated.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        GetPrivateProfileString(L"ReplicationDlg", L"Xduplicate", L"2", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XDUPLICATE, szString);
+
+        GetPrivateProfileString(L"ReplicationDlg", L"Yduplicate", L"2", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YDUPLICATE, szString);
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_REPLICATE:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int Xsize, Ysize;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+            Xsize = GetDlgItemInt(hDlg, IDC_XDUPLICATE, &bSuccess, TRUE);
+            Ysize = GetDlgItemInt(hDlg, IDC_YDUPLICATE, &bSuccess, TRUE);
+
+            int iRes;
+            iRes = ReplicateImage(InputFile, OutputFile, Xsize, Ysize);
+            if (iRes != 1) {
+                MessageMySETIappError(hDlg, iRes, L"Resize image error");
+            }
+            wcscpy_s(szCurrentFilename, OutputFile);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReplicationDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReplicationDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XDUPLICATE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReplicationDlg", L"Xduplicate", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YDUPLICATE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReplicationDlg", L"Yduplicate", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
 // Message handler for AddConstantDlg dialog box.
 // 
 //*******************************************************************************
@@ -3115,6 +3446,182 @@ INT_PTR CALLBACK AddConstantDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 
             GetDlgItemText(hDlg, IDC_FOLD_NUMBER, szString, MAX_PATH);
             WritePrivateProfileString(L"AddConstantDlg", L"Value", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
+// Message handler for ExtractPacketsDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK ExtractSymbolsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        IMAGINGHEADER ImageHeader;
+
+        GetPrivateProfileString(L"ExtractSymbolsDlg", L"BinaryInput", L"message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"ExtractSymbolsDlg", L"ImageOutput", L"extracted.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        GetPrivateProfileString(L"ExtractSymbolsDlg", L"SkipBits", L"8", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_SKIP_BITS, szString);
+
+        GetPrivateProfileString(L"ExtractSymbolsDlg", L"xsizesymbol", L"1", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XSIZE_SYMBOL, szString);
+
+        GetPrivateProfileString(L"ExtractSymbolsDlg", L"ysizesymbol", L"1", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YSIZE_SYMBOL, szString);
+
+        int Approach = GetPrivateProfileInt(L"ExtractSymbolsDlg", L"Approach", 1, (LPCTSTR)strAppNameINI);
+        if (Approach == 1) {
+            CheckRadioButton(hDlg, IDC_1D, IDC_2D, IDC_1D);
+        }
+        else {
+            // Approach 2
+            CheckRadioButton(hDlg, IDC_1D, IDC_2D, IDC_2D);
+        }
+        return (INT_PTR)TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC bitType[] =
+            {
+                 { L"image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, bitType, L".raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            IMAGINGHEADER ImageHeader;
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, textType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_EXTRACT:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int SkipBits;
+            int xsizesymbol;
+            int ysizesymbol;
+
+            if (wcscmp(szTempImageFilename, L"") == 0) {
+                MessageBox(hDlg, L"Set temporary working image filename\nin Porperty->Settings", L"Missing settings",MB_OK);
+                return (INT_PTR)TRUE;
+            }
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+
+            SkipBits = GetDlgItemInt(hDlg, IDC_SKIP_BITS, &bSuccess, TRUE);
+            xsizesymbol = GetDlgItemInt(hDlg, IDC_XSIZE_SYMBOL, &bSuccess, TRUE);
+            ysizesymbol = GetDlgItemInt(hDlg, IDC_YSIZE_SYMBOL, &bSuccess, TRUE);
+
+            int Approach;
+            if (IsDlgButtonChecked(hDlg, IDC_1D)) {
+                Approach = 1;
+            }
+            else {
+                Approach = 2;
+            }
+
+            ExtractSymbols(hDlg, InputFile, OutputFile, SkipBits, xsizesymbol, ysizesymbol,Approach);
+            wcscpy_s(szCurrentFilename, OutputFile);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSymbolsDlg", L"BinaryInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSymbolsDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_SKIP_BITS, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSymbolsDlg", L"SkipBits", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XSIZE_SYMBOL, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSymbolsDlg", L"xsizesymbol", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YSIZE_SYMBOL, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSymbolsDlg", L"ysizesymbol", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_1D)) {
+                WritePrivateProfileString(L"ExtractSymbolsDlg", L"Approach", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ExtractSymbolsDlg", L"Approach", L"2", (LPCTSTR)strAppNameINI);
+            }
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;

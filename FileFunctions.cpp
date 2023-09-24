@@ -53,6 +53,10 @@
 // V1.2.4.1 2023-09-09  Added import CamIRa IMG file
 //                      Clean up of file open/save filename handling
 // V1.2.5.1 2023-09-09  Updated default directory handling
+// V1.2.6.1 2023-09-24  Correction, Display Image/BMP file was not displaying BMP file
+//                      Changed, display of 16, 32 bit image data, using scaled BMP file.
+//                      The BMP file is still only a 8bpp file.
+//                      (not applicable to A Sign in Space project)
 //
 #include "framework.h"
 #include "resource.h"
@@ -728,7 +732,6 @@ int DisplayImage(WCHAR* Filename)
         }
         if (hwndImage != NULL) {
             PostMessage(hwndImage, WM_COMMAND, IDC_GENERATE_BMP, 0l);
-            //InvalidateRect(hwndImage, NULL, TRUE);
             ShowWindow(hwndImage, SW_SHOW);
         }
         return 1;
@@ -765,7 +768,7 @@ int DisplayImage(WCHAR* Filename)
         hwndImage = CreateDialog(hInst, MAKEINTRESOURCE(IDD_IMAGE), hwndMain, ImageDlg);
     }
     if (hwndImage != NULL) {
-        InvalidateRect(hwndImage, NULL, TRUE);
+        PostMessage(hwndImage, WM_COMMAND, IDC_GENERATE_BMP, 0l);
         ShowWindow(hwndImage, SW_SHOW);
     }
     return 1;
@@ -824,8 +827,8 @@ void ExportFile(HWND hWnd, int wmId)
         return;
     }
 
-    if (ImageHeader.PixelSize != 1) {
-        MessageBox(hWnd, L"Input file must be 1 byte per pixel", L"File incompatible", MB_OK);
+    if (ImageHeader.PixelSize > 2) {
+        MessageBox(hWnd, L"Input file must be 1 or 2 byte per pixel", L"File incompatible", MB_OK);
         return;
     }
     if (ImageHeader.NumFrames == 3) {
@@ -890,6 +893,9 @@ void ExportFile(HWND hWnd, int wmId)
     if (wmId == IDM_FILE_TOBMP) {
         SaveBMP(szString, InputFile,RGBframes, AutoScale);
         wcscpy_s(szCurrentFilename, szString);
+        if (DisplayResults) {
+            DisplayImage(szCurrentFilename);
+        }
     }
     else if (wmId == IDM_FILE_TOTXT) {
         SaveTXT(szString, InputFile);
@@ -915,11 +921,17 @@ void ExportFile(HWND hWnd, int wmId)
 // 
 //  Xsize of image must be <= 8192
 // 
-//  2 types of BMP files are supported:
+//  Input image pixel supported 8,16,32 bit
+// 
+//  2 types of output BMP files are supported:
 //
 //  Input parameter RBGframes FALSE 
 //  8 bit per pixel, first frame from file
 //      AutoScale parameter TRUE, auto scale as greyscale image, 0 to 255
+//      AutoScale parameter only applies to 8 bit input image files.
+//      16 and 24 bit images are always automatically scaled as greyscale
+//      image, 0 to 255.  This is because there is no BMP file format for 
+//      16 or 32 bit monochrome images
 //
 //  Input parameter RBGframes TRUE
 //  24 bit per pixel, RGB interpetation, requires a 3 frame image file
@@ -941,7 +953,7 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
     IMAGINGHEADER ImageHeader;
     BITMAPFILEHEADER BMPheader;
     BITMAPINFOHEADER BMPinfoheader;
-    RGBQUAD ColorTable[256];
+    RGBQUAD* ColorTable = NULL;
     BYTE* BMPimage;
 
     iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
@@ -949,7 +961,7 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
         return iRes;
     }
 
-    if (ImageHeader.PixelSize != 1) {
+    if (ImageHeader.PixelSize > 2) {
         return 0;
     }
 
@@ -1145,79 +1157,49 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
     }
     else {
         //
-        // convert image data to 8 bit DIB/BMP format.
+        // convert image data to 8 bit DIB/BMP format
+        // 
         // If xsize is odd add pad to even size.
         // Pad as required in BMP 'stride' size.
         //  
         // only first frame file saved.
         //
-        // scale display using RGBQUAD color map
+        // 8 bit input image, scale display using RGBQUAD color map, do not scale image data
+        // 16 or 32 bit, RGBQUAD color map is scaled 0 to 255 greyscale, input image data scaled to 8 bits
         //
         int PixelMin, PixelMax;
         int InputFrameSize;
         int Stride;
         float Scale, Offset;
+        int MaxPixel = 255;
+        
+        if (ImageHeader.PixelSize > 1) {
+            AutoScale = 1;
+        }
 
         if (InputImage[0] < 0) {
             PixelMin = PixelMax = 0;
         }
-        else if(InputImage[0] > 255) {
-            PixelMin = PixelMax = 255;
-        }
-        else {
-            PixelMin = PixelMax = InputImage[0];
-        }
+        PixelMin = PixelMax = InputImage[0];
 
         InputFrameSize = ImageHeader.Xsize * ImageHeader.Ysize;
-
-        // correct for odd column size
-        biWidth = ImageHeader.Xsize;
-        if (biWidth % 2 != 0) {
-            // make sure bitmap width is even
-            biWidth++;
-        }
-
-        // BMP files have a specific requirement for # of bytes per line
-        // This is called stride.  The formula used is from the specification.
-        Stride = ((((biWidth * 8) + 31) & ~31) >> 3); // 8 bpp
-        BMPimageBytes = Stride * ImageHeader.Ysize; // size of image in bytes
-
-        // allocate zero paddded image array
-        BMPimage = (BYTE*) calloc(BMPimageBytes, 1);
-        if (BMPimage == NULL) {
-            delete[] InputImage;
-            return -1;
-        }
-
-        int InputOffset;
-        int BMPOffset;
-        BYTE Pixel;
-        int ImagePixel;
-
-        // copy image to BMPimage
-        for (int y = 0; y < ImageHeader.Ysize; y++) {
-            InputOffset = y * ImageHeader.Xsize;
-            BMPOffset = y * Stride;
-            for (int x = 0; x < ImageHeader.Xsize; x++) {
-                ImagePixel = InputImage[InputOffset + x];
-                if (ImagePixel < 0) {
-                    Pixel = 0;
-                }
-                else if (ImagePixel > 255) {
-                    Pixel = 255;
-                }
-                else {
-                    Pixel = ImagePixel;
-                }
-                if (Pixel < PixelMin) PixelMin = Pixel;
-                if (Pixel > PixelMax) PixelMax = Pixel;
-                BMPimage[BMPOffset + x] = Pixel;
+        // scan image for scaling
+        for (int i=0; i < InputFrameSize; i++) {
+            if (InputImage[i] < 0) {
+                InputImage[i] = 0;
+            }
+            if (InputImage[i] < PixelMin) {
+                PixelMin = InputImage[i];
+            }
+            if (InputImage[i] > PixelMax) {
+                PixelMax = InputImage[i];
             }
         }
 
-        // scaling applies to colormap only
         if (AutoScale) {
             // compute scaling: Scale, Offset
+            // this is only used in the RGBQUAD color map for the image
+            // It does not change the pixel value
             if (PixelMax == PixelMin) {
                 // array is all the same value
                 // Make Image all white
@@ -1230,20 +1212,70 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
             }
         }
         else {
+            // this can only happens if input image is 8 bit pixels
             Offset = 0.0;
             Scale = 1.0;
         }
 
-        // generate RGBDQUAD colormap
+        // correct for odd column size
+        biWidth = ImageHeader.Xsize;
+        if (biWidth % 2 != 0) {
+            // make sure bitmap width is even
+            biWidth++;
+        }
+
+        // BMP files have a specific requirement for # of bytes per line
+        // This is called stride.  The formula used is from the specification.
+        Stride = ((((biWidth * 8) + 31) & ~31) >> 3); // 8 bpp
+        BMPimageBytes = Stride * ImageHeader.Ysize; // size of image in pixels, 8bpp
+
+        // allocate zero paddded image array
+        BMPimage = (BYTE*) calloc(BMPimageBytes, 1);
+        if (BMPimage == NULL) {
+            delete[] InputImage;
+            return -1;
+        }
+
+        int InputOffset;
+        int BMPOffset;
+        int ImagePixel;
+
+        // copy image to BMPimage
+        for (int y = 0; y < ImageHeader.Ysize; y++) {
+            InputOffset = y * ImageHeader.Xsize;
+            BMPOffset = y * Stride;
+            for (int x = 0; x < ImageHeader.Xsize; x++) {
+                ImagePixel = InputImage[InputOffset + x];
+                if (ImageHeader.PixelSize > 1) {
+                    ImagePixel = (int)(Scale * (float)ImagePixel + Offset + 0.5);
+                }
+                // copy results into BMPimage
+                BMPimage[BMPOffset + x] = (BYTE)ImagePixel;
+            }
+        }
+
+        // generate RGBDQUAD colormaps
         int k;
-        for (int i = 0; i <= 255; i++) {
-            k = (int)(Scale * (float)i + Offset + 0.5);
-            if (k < 0) k = 0;
-            if (k > 255) k = 255;
-            ColorTable[i].rgbBlue = k;
-            ColorTable[i].rgbGreen = k;
-            ColorTable[i].rgbRed = k;
-            ColorTable[i].rgbReserved = 0;
+        ColorTable = new RGBQUAD[256];
+        if (ImageHeader.PixelSize == 1) {
+            for (int i = 0; i <= 255; i++) {
+                k = (int)(Scale * (float)i + Offset + 0.5);
+                if (k < 0) k = 0;
+                if (k > 255) k = 255;
+                ColorTable[i].rgbBlue = k;
+                ColorTable[i].rgbGreen = k;
+                ColorTable[i].rgbRed = k;
+                ColorTable[i].rgbReserved = 0;
+            }
+        }
+        else {
+            for (int i = 0; i <= 255; i++) {
+                ColorTable[i].rgbBlue = i;
+                ColorTable[i].rgbGreen = i;
+                ColorTable[i].rgbRed = i;
+                ColorTable[i].rgbReserved = 0;
+            }
+
         }
     }
     delete[] InputImage;
@@ -1252,8 +1284,8 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
 
     BMPheader.bfType = 0x4d42;  // required ID
     if (!RGBframes) {
-        // 8 bpp requires a colormap
-        BMPheader.bfSize = (DWORD)(sizeof(BMPheader) + sizeof(BMPinfoheader) + sizeof(ColorTable)) + BMPimageBytes;
+        // 8 bpp colormap
+        BMPheader.bfSize = (DWORD)(sizeof(BMPheader) + sizeof(BMPinfoheader) + sizeof(RGBQUAD) * 256) + BMPimageBytes;
     }
     else {
         // 24 bit bpp does not have a colormap
@@ -1262,8 +1294,8 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
     BMPheader.bfReserved1 = 0;
     BMPheader.bfReserved2 = 0;
     if (!RGBframes) {
-        // 8 bpp requires a colormap
-        BMPheader.bfOffBits = (DWORD)(sizeof(BMPheader) + sizeof(BMPinfoheader) + sizeof(ColorTable));
+        // 8 bpp colormap
+        BMPheader.bfOffBits = (DWORD)(sizeof(BMPheader) + sizeof(BMPinfoheader) + sizeof(RGBQUAD) * 256);
     }
     else {
         // 24 bit bpp does not have a colormap
@@ -1307,6 +1339,7 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
     // write color map only if greyscale image
     if (!RGBframes) {
         fwrite(ColorTable, sizeof(RGBQUAD), 256, Out);
+        delete[] ColorTable;
     }
 
     // write the image data
@@ -1892,7 +1925,7 @@ int CamIRaImport(HWND hWnd)
     }
     
     int NumFrames;
-    if (CamIRaHeader.SelectFrames <= 10) {
+    if (CamIRaHeader.SelectFrames <= 10 && CamIRaHeader.SelectFrames!=0) {
         NumFrames = CamIRaHeader.NumFrames1;
     }
     else {

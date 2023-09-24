@@ -41,6 +41,10 @@
 #define IDD_BITTOOLS_TEXT2STREAM        158
 #define IDD_IMGTOOLS_ADD_CONSTANT       159
 #define IDD_IMGTOOLS_STDDECIMATION      160
+#define IDD_IMGTOOLS_REPLICATION        161
+#define IDD_IMGTOOLS_REORDER_ALG        162
+#define IDD_BITTOOLS_EXTRACT_Packets    163
+#define IDD_BITTOOLS_EXTRACT_SYMBOLS    163
 #define IDC_CONVERT                     1000
 #define IDC_ABOUT_AUTHOR                1001
 #define IDC_XSIZE                       1001
@@ -61,6 +65,7 @@
 #define IDC_YSIZEI2                     1005
 #define IDC_APPEND                      1006
 #define IDC_NUM_FRAMES2                 1006
+#define IDC_YSIZE_SYMBOL                1006
 #define IDC_TEXT_OUTPUT                 1007
 #define IDC_ADD                         1007
 #define IDC_ADD2                        1008
@@ -89,10 +94,12 @@
 #define IDC_SETTINGS_AUTOSCALE_RESULTS  1027
 #define IDC_MIRROR_HORIZ                1027
 #define IDC_MIRROR_VERT                 1028
+#define IDC_IMG_TEMP                    1028
 #define IDC_SETTINGS_RGB_DISPLAY        1029
 #define IDC_ROTATE                      1029
 #define IDC_SETTINGS_AUTOSIZE           1030
 #define IDC_MIRROR                      1030
+#define IDC_IMG_TEMP_BROWSE             1030
 #define IDC_ROTATE_CCW                  1031
 #define IDC_ROTATE_CW                   1032
 #define IDC_BINARY_INPUT                1033
@@ -114,8 +121,15 @@
 #define IDC_XDECIMATE                   1043
 #define IDC_YDECIMATE                   1044
 #define IDC_INI_FILE                    1045
-#define IDC_INI_FILE2                   1046
 #define IDC_EXE_FILE                    1046
+#define IDC_XDUPLICATE                  1046
+#define IDC_YDUPLICATE                  1047
+#define IDC_REPLICATE                   1048
+#define IDC_COMBO_ALG                   1049
+#define IDC_XSIZE_SYMBOL                1052
+#define IDC_SKIP_BYTES                  1053
+#define IDC_1D                          1054
+#define IDC_2D                          1055
 #define IDC_REORDER                     1074
 #define IDC_IMAGE_INPUT_BROWSE          1077
 #define IDC_IMAGE_INPUT                 1078
@@ -176,6 +190,9 @@
 #define IDM_SUBTRACT_CONSTANT           32872
 #define IDM_ADDSUBTRACT_CONSTANT        32873
 #define IDM_IMAGETOOLS_STDECIMATION     32876
+#define IDM_IMAGETOOLS_REPLICATION      32879
+#define IDM_IMAGETOOLS_REORDER_ALG      32882
+#define IDM_BITTOOLS_EXTRACT_PACKETS    32884
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -184,8 +201,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        138
-#define _APS_NEXT_COMMAND_VALUE         32877
-#define _APS_NEXT_CONTROL_VALUE         1046
+#define _APS_NEXT_COMMAND_VALUE         32885
+#define _APS_NEXT_CONTROL_VALUE         1056
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

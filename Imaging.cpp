@@ -45,6 +45,10 @@
 // V1.2.4.1 2023-09-09	Added Add/Subtract constant from images
 //						Changed Sum images to add/subtract images
 // V1.2.5.1 2023-09-09  Added stanard image decimation (summation)
+// V1.2.6.1 2023-09-24  Added Increase image size by replication.
+//						Added the start of reorder using algotrithm
+//                      Added extract block symbols from image file
+//                      (save as 2D image file, right padded with null symbols)
 //
 #include "framework.h"
 #include "stdio.h"
@@ -54,6 +58,7 @@
 #include "Globals.h"
 #include "Imaging.h"
 #include "FileFunctions.h"
+#include "CalculateReOrder.h"
 
 //*****************************************************************************************
 //
@@ -3137,6 +3142,120 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 
 //******************************************************************************
 //
+// ReorderAlgDlg
+// 
+// This function is used to be used to change the Pixel size (in bytes) from the
+// old image to the new image.
+//
+// 
+// This can also be used to change the x,y size of the image.  This useful for
+// converting a linear image file into a 2D image file.
+// 
+// This copies an image file in one format to a new format using an algorithm based
+// reorering.  If alogrithm == 0 then just apply new image size.  Please note that most
+// reordering algorithms output the same size image as the input image.  In these cases
+// the new size is ignored except for the Pixel Size.  If new PixelSize is 0 then
+// the new pixel Size will be the same as the old Pixel Size.
+// 
+// Limitations:  old image Xsize*Ysize must equal Xsize*Ysize of new image file
+//  
+// If the new Pixels size is smaller than the old pixel size then the values will
+// be clipped as follows:
+//		1 byte	- clipped at 255
+//		2 bytes	- clipped at 65535
+//		4 bytes - negative numbers will be set to 0
+// 
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* InputFile		Image file to sum next wnext file
+//	WCHAR* OutputFile		Reordered image file
+//	int Xsize				New x size (width)
+//	int Ysize				New y size (length)
+//	int PixelSize			New Pixel size in bytes (must be 1,2 or 4)
+//	int Algorithm			Algorithm to use for reordering
+//							0 - don't reorder (sill apply new sizes if needed)
+//  return value:
+//  1 - Success
+//	2 - Success, image size is the same size as the input image size
+//  !=1or2 Error see standardized app error list at top of this source file
+//
+//*******************************************************************************
+int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize,
+	int Algorithm)
+{
+	int* InputImage;
+	int ResizeFlag;
+	IMAGINGHEADER ImageHeader;
+	errno_t ErrNum;
+	PIXEL Pixel;
+	FILE* Out;
+
+	LoadImageFile(&InputImage, InputFile, &ImageHeader);
+
+	CalculateReOrder(0, 0, Xsize, Ysize, Algorithm, &ResizeFlag);
+	if (ResizeFlag < 0) {
+		return 0;
+	}
+
+	if (ResizeFlag) {
+		if (ImageHeader.Xsize * ImageHeader.Ysize != Xsize * Ysize) {
+			delete[] InputImage;
+			return 0;
+		}
+
+		ImageHeader.Xsize = Xsize;
+		ImageHeader.Ysize = Ysize;
+	}
+	if (PixelSize != 0) {
+		ImageHeader.PixelSize = PixelSize;
+	}
+
+	// write out new image file
+	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+	if (Out == NULL) {
+		delete[] InputImage;
+		return -2;
+	}
+
+	//write output image
+	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
+
+	// write image
+	int Offset;
+	int Address;
+	for (int Frame=0; Frame < ImageHeader.NumFrames; Frame++) {
+		Offset = Frame * ImageHeader.Xsize * ImageHeader.Ysize;
+		for (int y = 0; y < ImageHeader.Ysize; y++) {
+			for (int x = 0; x < ImageHeader.Xsize; x++) {
+				Address = Offset + CalculateReOrder(x, y, ImageHeader.Xsize, ImageHeader.Ysize,
+											Algorithm, &ResizeFlag);
+				Pixel.Long = InputImage[Address];
+				if (ImageHeader.PixelSize == 1) {
+					if (Pixel.Long > 255) Pixel.Long = 255;
+					fwrite(&Pixel.Byte, 1, 1, Out);
+				}
+				else if (ImageHeader.PixelSize == 2) {
+					if (Pixel.Long > 65535) Pixel.Long = 65535;
+					fwrite(&Pixel.Short, 2, 1, Out);
+				}
+				else {
+					fwrite(&Pixel.Long, 4, 1, Out);
+				}
+			}
+		}
+	}
+	fclose(Out);
+	delete[] InputImage;
+
+	if (DisplayResults) {
+		DisplayImage(OutputFile);
+	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
 // DecimateImage
 // 
 // This copies an image file in one size romat to a new size format
@@ -3348,15 +3467,13 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 //
 // StdDecimateImage
 // 
-// This copies an image file in one size romat to a new size format
+// This creates an image file in one size format to a new smaller size format.
+// It does this by summing the pixels in the decimate group size to generate the
+// the pixel value for the new image.  The new image is Original x,y size divided
+// by the x,y decimate size
+// 
 // Limitations:
 // Xsize and Ysize of input image must be divisible by the X,Y decimate size
-// example:
-// 2,2
-// 0 0
-// 0 1
-// This deletes every even numbered pixel in a row
-// and every even numbered row
 // 
 // Parameters:
 //	HWND hDlg				Handle of calling window or dialog
@@ -3536,3 +3653,541 @@ int AddConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value)
 
 	return 1;
 }
+
+//******************************************************************************
+//
+// ReplicateImage
+// 
+// This creates an enlarged image file from the original by replicating the pixels
+// value in the orginal image.  The new image is the x,y size of the original file
+// times the x,y duplication size.
+// 
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* InputFile		input image file
+//	WCHAR* OutputFile		Resized image file
+//	int Xduplicate
+//  int Yduplicate
+// 
+//  return value:
+//  1 - Success
+//  !=1 Error see standardized app error list at top of this source file
+//
+//*******************************************************************************
+int ReplicateImage(WCHAR* InputFile, WCHAR* OutputFile,
+	int Xsize, int Ysize)
+{
+	int* InputImage;
+	int* OutputImage;
+	IMAGINGHEADER ImageHeader;
+	errno_t ErrNum;
+	PIXEL Pixel;
+	FILE* Out;
+	int iRes;
+	if (Xsize <= 0 || Ysize <= 0) {
+		return 0;
+	}
+
+	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
+	if (iRes != 1) {
+		delete[]InputImage;
+		return iRes;
+	}
+
+	if ((ImageHeader.Xsize % Xsize) != 0 && (ImageHeader.Ysize % Ysize) != 0) {
+		// x,y images size must be divisible by x,y decimate size
+		return 0;
+	}
+
+	int OutXsize;
+	int OutYsize;
+
+	OutXsize = ImageHeader.Xsize * Xsize;
+	OutYsize = ImageHeader.Ysize * Ysize;
+
+	// Apply decimation kernel
+	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize * (size_t)ImageHeader.NumFrames];
+	if (OutputImage == NULL) {
+		delete[] InputImage;
+		return -1;
+	}
+
+	int PixelValue;
+	int Address;
+	int AddressOut;
+
+	for (int FrameNum = 0; FrameNum < ImageHeader.NumFrames; FrameNum++) {
+		for (int y = 0, yin = 0; y < OutYsize; y = y + Ysize, yin++) {
+			for (int x = 0, xin = 0; x < OutXsize; x = x + Xsize, xin++) {
+				AddressOut = xin + (yin * ImageHeader.Xsize) + (FrameNum * ImageHeader.Xsize * ImageHeader.Ysize);
+				PixelValue = InputImage[AddressOut];
+				for (int i = 0; i < Ysize; i++) {
+					for (int j = 0; j < Xsize; j++) {
+						Address = (x + j) + (OutXsize * (y + i)) + (FrameNum * OutXsize * OutYsize);
+						OutputImage[Address] = PixelValue;
+					}
+				}
+			}
+		}
+	}
+
+	delete[] InputImage;
+
+	// update header
+	ImageHeader.Xsize = OutXsize;
+	ImageHeader.Ysize = OutYsize;
+
+	//write output image
+	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+	if (Out == NULL) {
+		return -2;
+	}
+
+	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
+
+	// write image
+	for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize * ImageHeader.NumFrames); i++) {
+		Pixel.Long = OutputImage[i];
+		if (ImageHeader.PixelSize == 1) {
+			if (Pixel.Long > 255) Pixel.Long = 255;
+			fwrite(&Pixel.Byte, 1, 1, Out);
+		}
+		else if (ImageHeader.PixelSize == 2) {
+			if (Pixel.Long > 65535) Pixel.Long = 65535;
+			fwrite(&Pixel.Short, 2, 1, Out);
+		}
+		else {
+			fwrite(&Pixel.Long, 4, 1, Out);
+		}
+	}
+
+	fclose(Out);
+	delete[] OutputImage;
+
+	if (DisplayResults) {
+		DisplayImage(OutputFile);
+	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
+// ExtractSymbols
+//
+// 	There are 2 approaches to this problem.
+//	Approach 1: treat image as 1D Linear list of values organized, n*m in length which are translated to
+//				n by m size block symbols.
+//	Approach 2: 2D image subdivied into block symbols of nXm size. The symbols blocks are then
+//				treated as a linear list.  The image can always be rotated or mirrored before using this function to try other
+//				reading orders.  
+// 
+//	The 2 approaches differ by the grouping of the nXm values.  Once the input images are input into the
+//	nXm block symbol.  The remainder of the processing is the same.
+// 
+//	The block symbol are treated as a stream of block symbols (mXn in size).
+//	The total number of block symbols is xsize*ysize.
+//	A block symbol which contains all 0s is a null symbol.
+//	Block symbols including null symbols are strung together to form a sentence.
+//  Null symbols are like whitespace in a sentence or a pause in speech to allow 
+//	a separation grouped items.  When the pause is long enough a new sentence is started
+//	the 'dead' air or  whitespace is ignored until a non-null symbols is found.
+//	It is possible that there is an 'end of sentence' symbol but this extraction only uses gaps to 
+//	identify 'sentences'.
+// 
+// The outut image:
+//	Consists of the conversation.  Null block pauses between sentences have been removed.
+//	image width:	The length of the longest sentence.  Shorter sentenaces are null padded
+//					on the right side.
+//	image height:	The number of sentences found * 2.  y symbol size blanks rows are added between
+//					sentences to help isolate them visually.
+//	
+// restrictions:
+// Only single frame input files allowed.
+// For Approach1:	The input file xsize*ysize must be divisible by n*m
+// For Approach2:	The input file xsize must be divisible by n, The ysize must be divisble by m
+// This function may use a temporary image file for intermediate results.
+//	
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* InputFile		input image file
+//	WCHAR* OutputFile		output image file
+//	int MaxNull				When the number of null blocks exceeds this size
+//							then the last symbol group is ended.
+//  int xsizesymbol			The x size of a block symbol
+//  int ysizesymbol			The y size of a block symbol
+// 
+//  return value:
+//  1 - Success
+//  !=1 Error see standardized app error list at top of this source file
+//
+//*******************************************************************************
+int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
+					int xsizesymbol, int ysizesymbol, int Approach) {
+	errno_t ErrNum;
+	int* InputImage;
+	IMAGINGHEADER ImageHeader;
+	int iRes;
+
+	if (xsizesymbol == 0 || ysizesymbol == 0) {
+		MessageBox(hDlg, L"X or Y symbol size can not be 0", L"File I/O", MB_OK);
+		return 0;
+	}
+
+	if (Approach != 1 && Approach != 2) {
+		MessageBox(hDlg, L"Input file aprroach invalid", L"File I/O", MB_OK);
+		return 0;
+	}
+
+	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
+	if (iRes != 1) {
+		MessageBox(hDlg, L"Error reading input file", L"File I/O", MB_OK);
+		return iRes;
+	}
+
+	if (((ImageHeader.Xsize*ImageHeader.Ysize) % (xsizesymbol * ysizesymbol))!=0) {
+		delete[] InputImage;
+		MessageBox(hDlg, L"input x,y size must be divisible by x,y symbol size", L"File I/O", MB_OK);
+		return 0;
+	}
+
+	if (ImageHeader.NumFrames != 1) {
+		delete[] InputImage;
+		MessageBox(hDlg, L"Multiple frame files are not supported", L"File I/O", MB_OK);
+		return 0;
+	}
+
+	int NumSymbolsGroups = 0;	// number of 'sentences' in output
+	int c = 0;	// # of symbols in longest 'sentence'
+	int* SymbolList;			// this is image that is SymbolListXsize by ysizesymbol
+	int TotalInputSymbols;
+	int SymbolListXsize;
+
+	TotalInputSymbols = (ImageHeader.Xsize * ImageHeader.Ysize) / (xsizesymbol * ysizesymbol);
+	SymbolList = new int[(size_t)ImageHeader.Xsize * (size_t)ImageHeader.Ysize];
+	SymbolListXsize = TotalInputSymbols * xsizesymbol;
+
+	if (SymbolList == NULL) {
+		delete[] InputImage;
+		MessageBox(hDlg, L"SymbolLIst memory allocation failure", L"File I/O", MB_OK);
+		return -1;
+	}
+
+	if (Approach == 1) {
+		//1D linear list of symbols bits
+		int Address = 0;
+		int SymbolListAddress;
+		for (int k = 0; k < TotalInputSymbols; k++) {
+			for (int y = 0; y < ysizesymbol; y++) {
+				for (int x = 0; x < xsizesymbol; x++, Address++) {
+					SymbolListAddress = (y * SymbolListXsize) + (k * xsizesymbol) + x;
+					SymbolList[SymbolListAddress] = InputImage[Address];
+				}
+			}
+		}
+	}
+	else {
+		//2d subdivided image
+		int Address = 0;
+		int SymbolListAddress = 0;
+		for (int k = 0; k < ysizesymbol; k++) {
+			for (int y = 0; y < ImageHeader.Ysize; y = y + ysizesymbol) {
+				for (int x = 0; x < ImageHeader.Xsize; x++, SymbolListAddress++) {
+					Address = x + ((y+k)*ImageHeader.Xsize);
+					SymbolList[SymbolListAddress] = InputImage[Address];
+				}
+			}
+		}
+	}
+	delete[] InputImage;
+
+	// At this point SymbolList is a linear list of symbols stored as a 2d image
+	// which is ((ImageHeader.Xsize*ImageHeader.Ysize)/ysizesymbol) (H) by ysizesymbol (V)
+
+	// save results in intermediate working file
+	if (wcscmp(szTempImageFilename, L"") != 0) {
+		FILE* TempFile;
+		ErrNum = _wfopen_s(&TempFile, szTempImageFilename, L"wb");
+		if (!TempFile) {
+			delete[] SymbolList;
+			MessageBox(hDlg, L"Could not open working image file", L"File I/O", MB_OK);
+			return -2;
+		}
+
+		// write out image header
+		IMAGINGHEADER TempHeader;
+		memcpy_s(&TempHeader, sizeof(TempHeader), &ImageHeader, sizeof(ImageHeader));
+		TempHeader.Xsize = (ImageHeader.Xsize * ImageHeader.Ysize) / ysizesymbol;
+		TempHeader.Ysize = ysizesymbol;
+		TempHeader.NumFrames = 1;
+		fwrite(&TempHeader, sizeof(TempHeader), 1, TempFile);
+
+		for (int i = 0; i < (TempHeader.Xsize * TempHeader.Ysize); i++) {
+			PIXEL Pixel;
+			Pixel.Long = SymbolList[i];
+			if (ImageHeader.PixelSize == 1) {
+				if (Pixel.Long > 255) Pixel.Long = 255;
+				fwrite(&Pixel.Byte, 1, 1, TempFile);
+			}
+			else if (ImageHeader.PixelSize == 2) {
+				if (Pixel.Long > 65535) Pixel.Long = 65535;
+				fwrite(&Pixel.Short, 2, 1, TempFile);
+			}
+			else {
+				fwrite(&Pixel.Long, 4, 1, TempFile);
+			}
+		}
+		fclose(TempFile);
+	}
+
+	int LengthSymbolGroup;
+	int NumSymbols = 0;
+	PIXEL Pixel;
+	int LongestSymbolGroup = 0;
+
+	// scan the SymbolList image for number of symbols groups
+	// a group of symbols starts with a non-0 symbols and includes all subsequent symbols with
+	// that have less the maxBlank null symbols bewteen them
+	// They output image will be LongestSymbolGroup (H) x NumSymbolsGroups (V)
+	// Each line will be null padded to the right ou to the Longest Symbol Group
+	// TotalInputSymbols is the total number of symbols in the SymbolList
+	//
+	// First determine the longest 'sentence' in the SymbolList
+	//
+	{
+		LengthSymbolGroup = 0;
+		for (int i = 0; i < TotalInputSymbols; i++) {
+			int SymbolFlag;
+			SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize);
+			//look for start of symbol
+			if (SymbolFlag == 0) {
+				continue;
+			}
+			NumSymbols++;
+			NumSymbolsGroups++;
+			// found start of sentence
+			// now  find break that is greater then MaxNull
+			LengthSymbolGroup++;
+			if (LengthSymbolGroup > LongestSymbolGroup) {
+				LongestSymbolGroup++;
+			}
+			int NullsFound = 0;
+			for (i++; i < TotalInputSymbols; i++) {
+				SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize);
+				//look for start of symbol
+				if (SymbolFlag == 1) {
+					NullsFound = 0;
+					NumSymbols++;
+					LengthSymbolGroup++;
+					if (LengthSymbolGroup > LongestSymbolGroup) {
+						LongestSymbolGroup++;
+					}
+					continue;
+				}
+				NullsFound++;
+				if (NullsFound > MaxNull) {
+					// end of sentence
+					LengthSymbolGroup = 0;
+					break;
+				}
+				LengthSymbolGroup++;
+				if (LengthSymbolGroup > LongestSymbolGroup) {
+					LongestSymbolGroup++;
+				}
+			}
+		}
+	}
+
+	if (LongestSymbolGroup == 0) {
+		// this is an empty file
+		MessageBox(hDlg, L"No symbols found in the file", L"File empty", MB_OK);
+		return 0;
+	}
+
+	int* OutputImage;
+	int* OutputGroup;
+	int OutXsize;
+	int OutYsize;
+	FILE* Out;
+
+	OutXsize = LongestSymbolGroup* xsizesymbol;
+	OutYsize = NumSymbolsGroups * ysizesymbol; // in future allow space between sentences (*2) as parameter
+		
+	OutputGroup = new int[(size_t)OutXsize* ysizesymbol];
+	if (OutputGroup == NULL) {
+		delete[] SymbolList;
+		return -1;
+	}
+
+	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize];
+	if (OutputImage == NULL) {
+		delete[] OutputGroup;
+		delete[] SymbolList;
+		return -1;
+	}
+
+	// now that we know the sizes
+	// process the image into the output image
+	int GroupAddress;
+	int Sentence = 0;
+	NumSymbolsGroups = 0;
+	LongestSymbolGroup = 0;
+	NumSymbols = 0;
+	// clear symbol line for first symbol group
+	for (int k = 0; k < (OutXsize * ysizesymbol); k++) {
+		OutputGroup[k] = 0;
+	}
+
+	{
+		LengthSymbolGroup = 0;
+		int i;
+		for (i = 0; i < TotalInputSymbols; i++) {
+			int SymbolFlag;
+			SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize);
+			//look for start of symbol
+			if (SymbolFlag == 0) {
+				continue;
+			}
+			GroupAddress = LengthSymbolGroup * xsizesymbol;
+			SymbolCopy(&SymbolList[i * xsizesymbol], &OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, SymbolListXsize, OutXsize);
+			NumSymbols++;
+			NumSymbolsGroups++;
+			// found start of sentence
+			// now  find break that is greater then MaxNull
+			LengthSymbolGroup++;
+			int NullsFound = 0;
+			for (i++; i < TotalInputSymbols; i++) {
+				SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize);
+				//look for start of symbol
+				if (SymbolFlag == 1) {
+					NullsFound = 0;
+					GroupAddress = LengthSymbolGroup * xsizesymbol;
+					SymbolCopy(&SymbolList[i * xsizesymbol], &OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, SymbolListXsize, OutXsize);
+					NumSymbols++;
+					LengthSymbolGroup++;
+					continue;
+				}
+				NullsFound++;
+				if (NullsFound > MaxNull) {
+					// end of sentence
+					//copy sentence (OutputGroup to OutputImage)
+					for (int n = 0; n < (OutXsize/ xsizesymbol); n++) {
+						int AddressOut;
+						GroupAddress = n * xsizesymbol;
+						AddressOut = (Sentence * OutXsize * ysizesymbol) + GroupAddress;
+						SymbolCopy(&OutputGroup[GroupAddress], &OutputImage[AddressOut], xsizesymbol, ysizesymbol, OutXsize, OutXsize);
+					}
+					// clear symbol line for first symbol group
+					for (int k = 0; k < (OutXsize * ysizesymbol); k++) {
+						OutputGroup[k] = 0;
+					}
+					Sentence++;
+					LengthSymbolGroup = 0;
+					break;
+				}
+				NumSymbols++;
+				LengthSymbolGroup++;
+			}
+			if (i >= TotalInputSymbols) {
+				break;
+			}
+		}
+		if (i >= TotalInputSymbols) {
+			// this is last sentence
+			//check if it needs to be output
+			if (Sentence < (OutYsize / ysizesymbol)) {
+				for (int n = 0; n < (OutXsize / xsizesymbol); n++) {
+					int AddressOut;
+						GroupAddress = n * xsizesymbol;
+						AddressOut = (Sentence * OutXsize * ysizesymbol) + GroupAddress;
+						SymbolCopy(&OutputGroup[GroupAddress], &OutputImage[AddressOut], xsizesymbol, ysizesymbol, OutXsize, OutXsize);
+				}
+			}
+			Sentence++;
+		}
+	}
+
+	delete[] OutputGroup; 
+	delete[] SymbolList;
+
+	ImageHeader.Xsize = OutXsize;
+	ImageHeader.Ysize = OutYsize;
+	ImageHeader.NumFrames = 1;
+
+	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+	if (!Out) {
+		delete[] OutputImage;
+		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
+		return -2;
+	}
+
+	// write out image header	
+	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
+
+	// write image
+	for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize); i++) {
+		Pixel.Long = OutputImage[i];
+		if (ImageHeader.PixelSize == 1) {
+			if (Pixel.Long > 255) Pixel.Long = 255;
+			fwrite(&Pixel.Byte, 1, 1, Out);
+		}
+		else if (ImageHeader.PixelSize == 2) {
+			if (Pixel.Long > 65535) Pixel.Long = 65535;
+			fwrite(&Pixel.Short, 2, 1, Out);
+		}
+		else {
+			fwrite(&Pixel.Long, 4, 1, Out);
+		}
+	}
+
+	delete[] OutputImage;
+	fclose(Out);
+
+	if (DisplayResults) {
+		DisplayImage(OutputFile);
+	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
+// SymbolTest, detect non null symbols
+// 
+// Private function
+//
+//******************************************************************************
+int SymbolTest(int* InputImage, int xsize, int ysize, int Yoffset) {
+	int Address;
+	for (int y = 0; y < ysize; y++) {
+		Address = Yoffset * y;
+		for (int x = 0; x < xsize; x++) {
+			if (InputImage[Address + x] != 0) {
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+//******************************************************************************
+//
+// SymbolCopy, copy symbol from one image to antoher
+// 
+// Private function
+//
+//******************************************************************************
+void SymbolCopy(int* InputImage, int* OutputImage, int xsize, int ysize,
+				int YoffsetIn, int YoffsetOut) {
+	int AddressIn;
+	int AddressOut;
+	for (int y = 0; y < ysize; y++) {
+		AddressIn = YoffsetIn * y;
+ 		AddressOut = YoffsetOut * y;
+		for (int x = 0; x < xsize; x++) {
+			OutputImage[AddressOut + x] = InputImage[AddressIn + x];
+		}
+	}
+	return;
+}
+

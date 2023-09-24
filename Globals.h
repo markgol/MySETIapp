@@ -12,6 +12,7 @@ extern CString strAppNameINI;
 extern WCHAR szBMPFilename[MAX_PATH];
 extern WCHAR szCurrentFilename[MAX_PATH];
 extern WCHAR szBMPFilename[MAX_PATH];
+extern WCHAR szTempImageFilename[MAX_PATH];
 extern int DisplayResults;
 extern int AutoScaleResults;
 extern int DefaultRBG;

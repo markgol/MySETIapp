@@ -79,6 +79,19 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 
 int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int ScalePixel);
 
+int ReplicateImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize);
+
 int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize);
 
 int AddConstant2Image(WCHAR *InputFile, WCHAR *OutputFile, int Value);
+
+int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize, int Algorithm);
+
+int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipBits,
+					int xsizesymbol, int ysizesymbol, int Approach);
+
+int SymbolTest(int* InputImage, int xsize, int ysize, int Yoffset);
+
+void SymbolCopy(int* InputImage, int* OutputImage, int xsize, int ysize,
+	int YoffsetIn, int YoffsetOut);
+

@@ -8,7 +8,7 @@ void BitDistance(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize);
 
 void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int PrologueSize);
 
-void FileHexDump(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int xsize);
+void FileHexDump(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int xsize, int SkipBytes);
 
 void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum);

@@ -142,6 +142,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="bitstream.h" />
+    <ClInclude Include="CalculateReOrder.h" />
     <ClInclude Include="FileFunctions.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Globals.h" />
@@ -152,6 +153,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AboutDlg.cpp" />
+    <ClCompile Include="CalculateReOrder.cpp" />
     <ClCompile Include="FileFunctions.cpp" />
     <ClCompile Include="Imaging.cpp" />
     <ClCompile Include="ImagingDialogs.cpp" />
