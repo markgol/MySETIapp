@@ -45,6 +45,8 @@
 #define IDD_IMGTOOLS_REORDER_ALG        162
 #define IDD_BITTOOLS_EXTRACT_Packets    163
 #define IDD_BITTOOLS_EXTRACT_SYMBOLS    163
+#define IDD_IMGTOOLS_EXTRACT_SYMBOLS    163
+#define IDD_IMGTOOLS_INSERT_IMAGE       164
 #define IDC_CONVERT                     1000
 #define IDC_ABOUT_AUTHOR                1001
 #define IDC_XSIZE                       1001
@@ -116,6 +118,7 @@
 #define IDC_SCALE_PIXEL                 1040
 #define IDC_VALUE                       1040
 #define IDC_GENERATE_BMP                1041
+#define IDC_INVERT                      1041
 #define IDC_BATCH                       1042
 #define IDC_XSIZE_END                   1042
 #define IDC_XDECIMATE                   1043
@@ -130,6 +133,8 @@
 #define IDC_SKIP_BYTES                  1053
 #define IDC_1D                          1054
 #define IDC_2D                          1055
+#define IDC_HIGHLIGHT                   1056
+#define IDC_OVERWRITE                   1059
 #define IDC_REORDER                     1074
 #define IDC_IMAGE_INPUT_BROWSE          1077
 #define IDC_IMAGE_INPUT                 1078
@@ -193,6 +198,9 @@
 #define IDM_IMAGETOOLS_REPLICATION      32879
 #define IDM_IMAGETOOLS_REORDER_ALG      32882
 #define IDM_BITTOOLS_EXTRACT_PACKETS    32884
+#define IDM_IMGTOOLS_EXTRACT_PACKETS    32885
+#define ID_IMAGETOOLS_ADD               32886
+#define IDM_IMGTOOLS_INSERT_IMAGE       32887
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -201,8 +209,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        138
-#define _APS_NEXT_COMMAND_VALUE         32885
-#define _APS_NEXT_CONTROL_VALUE         1056
+#define _APS_NEXT_COMMAND_VALUE         32888
+#define _APS_NEXT_CONTROL_VALUE         1060
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

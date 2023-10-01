@@ -98,6 +98,14 @@
 //                      (save as 2D image file, right padded with null symbols)
 //                      Added temp image filename to app settings.  For use in debugging
 //                      functions by saving intermediate results.
+// V1.2.7.1 2023-10-01  Added invert of input bits in bitstream to the bitstream to text and
+//                      bistream to image operations
+//                      Added insert/add image into an existing image, to be able to recreate
+//                      'A Sign in Space' starmap from the 5 sign images or to make up one's
+//                      own message.
+//                      Correction, 2d symbol extraction requires image y size to be
+//						divisible by y symbol size.
+//						Changed, block symbol extraction to allow highlighting phrases
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -197,6 +205,7 @@ INT_PTR CALLBACK    AddConstantDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    StdDecimationDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ReplicationDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ReorderAlgDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    InsertImageDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -474,11 +483,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_BITTOOLS_BINARYIMAGE:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_BINARYIMAGE), hWnd, BitImageDlg);
                 break;
-                
-            case IDM_BITTOOLS_EXTRACT_PACKETS:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_EXTRACT_SYMBOLS), hWnd, ExtractSymbolsDlg);
-                break;
-
+            
             // Image tools menu
             case IDM_IMGTOOLS_PROPERTIES:
             {
@@ -504,12 +509,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_EXTRACT), hWnd, ExtractImageDlg);
                 break;
 
+            case IDM_IMGTOOLS_EXTRACT_PACKETS:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_EXTRACT_SYMBOLS), hWnd, ExtractSymbolsDlg);
+                break;
+
             case IDM_IMGTOOLS_APPEND_END:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_APPEND_END), hWnd, AppendEndImageDlg);
                 break;
 
             case IDM_IMGTOOLS_APPEND_RIGHT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_APPEND_RIGHT), hWnd, AppendRightImageDlg);
+                break;
+
+            case IDM_IMGTOOLS_INSERT_IMAGE:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_INSERT_IMAGE), hWnd, InsertImageDlg);
                 break;
 
             case IDM_IMGTOOLS_REORDER:

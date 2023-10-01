@@ -34,6 +34,9 @@
 // V1.0.0.1 2023-08-20  Initial Release
 // V1.2.0.1 2023-08-30  Added Convert text to packed bitstream file
 // V1.2.6.1 2023-09-24  Added Skip bytes to HEX dump
+// V1.2.7.1 2023-10-01  Added invert of input bits in bitstream to the bitstream to text and
+//                      bistream to image operations: ExtractFromBitStreamText() and
+//                      BitStream2Image(), BatchBitStream2Image()
 //
 #include "framework.h"
 #include <windowsx.h>
@@ -81,7 +84,7 @@
 //*******************************************************************
 void ExtractFromBitStreamText(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int NumBlockHeaderBits, int NumBlockBodyBits, int NumBlocks,
-    int xsize)
+    int xsize, int Invert)
 {
     // This function is large because of formatting the output
     //  text file into header, {block header, block}, footer
@@ -131,7 +134,14 @@ void ExtractFromBitStreamText(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
             // input file is byte oriented MSB to LSB representing the bit order that the message was received
             // This does not imply any bit ordering in the message itself.
             BitValue = CurrentByte & (0x80 >> CurrentByteBit);
-
+            if (Invert == 1) {
+                if (BitValue == 0) {
+                    BitValue = 1;
+                }
+                else {
+                    BitValue = 0;
+                }
+            }
             // allow for message prolouge/header at the beginning of the message 
             if (PrologueSize > 0) {
                 if (CurrentPrologueBit < PrologueSize) {
@@ -869,7 +879,7 @@ void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 //******************************************************************************
 void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize, int xsizeEnd, 
-    int BitDepth, int BitOrder, int BitScale)
+    int BitDepth, int BitOrder, int BitScale, int Invert)
 {
     int SaveDisplayResults;
 
@@ -922,7 +932,7 @@ void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
         
         err= BitStream2Image(hDlg, InputFile, NewFilename,
             PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, CurrentXsize,
-            BitDepth, BitOrder, BitScale);
+            BitDepth, BitOrder, BitScale, Invert);
         if (err != 1) {
             TCHAR pszMessageBuf[MAX_PATH];
             StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
@@ -966,7 +976,7 @@ void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 //******************************************************************************
 int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
-    int BitDepth, int BitOrder, int BitScale)
+    int BitDepth, int BitOrder, int BitScale, int Invert)
 {
     FILE* In;
     FILE* OutRaw;
@@ -1067,7 +1077,14 @@ int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
         while (CurrentByteBit < 8) {
             // MSB to LSB in input data file 
             BitValue = CurrentByte & (0x80 >> CurrentByteBit);
-
+            if (Invert==1) {
+                if (BitValue == 0) {
+                    BitValue = 1;
+                }
+                else {
+                    BitValue = 0;
+                }
+            }
             // Prologue block processing
             // skip prologue, PrologueSize bits
             if (PrologueSize > 0) {  // 0 based index

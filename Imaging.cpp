@@ -49,6 +49,11 @@
 //						Added the start of reorder using algotrithm
 //                      Added extract block symbols from image file
 //                      (save as 2D image file, right padded with null symbols)
+// V1.2.7.1	2023-10-01	Correction, 2d symbol extraction requires image y size to be
+//						divisible by y symbol size.
+//						Changed block symbol extraction to allow highlighting phrases
+//						Phrase is output using 0, 255 for symbol data, 25 for null symbols
+//						between symbols in a phrase and 40 for null symbols not in the phrase
 //
 #include "framework.h"
 #include "stdio.h"
@@ -3816,18 +3821,27 @@ int ReplicateImage(WCHAR* InputFile, WCHAR* OutputFile,
 //							then the last symbol group is ended.
 //  int xsizesymbol			The x size of a block symbol
 //  int ysizesymbol			The y size of a block symbol
-// 
+//  int Approach			1 - treat input image as linear list of bits
+//							2 - subdivde image into blocks xsizesymbol by ysizesymbol
+//								treat those blocks as symbols.
+//	int Highlight			0 - don't highlight symbols (data is kept the same as input)
+//							1 - highlight symbol, 0 and 255 used for symbol data, 40 used
+//								for non phrase null symbols, 25 used for in phrase null symbols
+//							Vertical spacing between spacing between phrases is used to visually
+//							separate phrases. 
 //  return value:
 //  1 - Success
 //  !=1 Error see standardized app error list at top of this source file
 //
 //*******************************************************************************
 int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
-					int xsizesymbol, int ysizesymbol, int Approach) {
+					int xsizesymbol, int ysizesymbol, int Approach, int Highlight) {
 	errno_t ErrNum;
 	int* InputImage;
 	IMAGINGHEADER ImageHeader;
 	int iRes;
+	int HIGHLIGHT_NULL = 40;
+	int NULL_IN_PHRASE = 25;
 
 	if (xsizesymbol == 0 || ysizesymbol == 0) {
 		MessageBox(hDlg, L"X or Y symbol size can not be 0", L"File I/O", MB_OK);
@@ -3849,6 +3863,14 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 		delete[] InputImage;
 		MessageBox(hDlg, L"input x,y size must be divisible by x,y symbol size", L"File I/O", MB_OK);
 		return 0;
+	}
+
+	if (Approach == 2) {
+		if (ImageHeader.Ysize % ysizesymbol != 0) {
+			delete[] InputImage;
+			MessageBox(hDlg, L"for 2D, input y size must be divisible by y symbol size", L"File I/O", MB_OK);
+			return 0;
+		}
 	}
 
 	if (ImageHeader.NumFrames != 1) {
@@ -3958,7 +3980,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 		LengthSymbolGroup = 0;
 		for (int i = 0; i < TotalInputSymbols; i++) {
 			int SymbolFlag;
-			SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize);
+			SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize, 0);
 			//look for start of symbol
 			if (SymbolFlag == 0) {
 				continue;
@@ -3973,7 +3995,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 			}
 			int NullsFound = 0;
 			for (i++; i < TotalInputSymbols; i++) {
-				SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize);
+				SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize, 0);
 				//look for start of symbol
 				if (SymbolFlag == 1) {
 					NullsFound = 0;
@@ -4035,7 +4057,12 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 	NumSymbols = 0;
 	// clear symbol line for first symbol group
 	for (int k = 0; k < (OutXsize * ysizesymbol); k++) {
-		OutputGroup[k] = 0;
+		if (Highlight == 1) {
+			OutputGroup[k] = HIGHLIGHT_NULL;
+		}
+		else {
+			OutputGroup[k] = 0;
+		}
 	}
 
 	{
@@ -4043,13 +4070,14 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 		int i;
 		for (i = 0; i < TotalInputSymbols; i++) {
 			int SymbolFlag;
-			SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize);
+			SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize, 0);
 			//look for start of symbol
 			if (SymbolFlag == 0) {
 				continue;
 			}
 			GroupAddress = LengthSymbolGroup * xsizesymbol;
-			SymbolCopy(&SymbolList[i * xsizesymbol], &OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, SymbolListXsize, OutXsize);
+			SymbolCopy(&SymbolList[i * xsizesymbol], &OutputGroup[GroupAddress], xsizesymbol, ysizesymbol,
+						SymbolListXsize, OutXsize, Highlight);
 			NumSymbols++;
 			NumSymbolsGroups++;
 			// found start of sentence
@@ -4057,17 +4085,19 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 			LengthSymbolGroup++;
 			int NullsFound = 0;
 			for (i++; i < TotalInputSymbols; i++) {
-				SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize);
+				SymbolFlag = SymbolTest(&SymbolList[i * xsizesymbol], xsizesymbol, ysizesymbol, SymbolListXsize, 0);
 				//look for start of symbol
 				if (SymbolFlag == 1) {
 					NullsFound = 0;
 					GroupAddress = LengthSymbolGroup * xsizesymbol;
-					SymbolCopy(&SymbolList[i * xsizesymbol], &OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, SymbolListXsize, OutXsize);
+					SymbolCopy(&SymbolList[i * xsizesymbol], &OutputGroup[GroupAddress], xsizesymbol, ysizesymbol,
+								SymbolListXsize, OutXsize, Highlight);
 					NumSymbols++;
 					LengthSymbolGroup++;
 					continue;
 				}
 				NullsFound++;
+
 				if (NullsFound > MaxNull) {
 					// end of sentence
 					//copy sentence (OutputGroup to OutputImage)
@@ -4075,17 +4105,36 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 						int AddressOut;
 						GroupAddress = n * xsizesymbol;
 						AddressOut = (Sentence * OutXsize * ysizesymbol) + GroupAddress;
-						SymbolCopy(&OutputGroup[GroupAddress], &OutputImage[AddressOut], xsizesymbol, ysizesymbol, OutXsize, OutXsize);
+						if (SymbolTest(&OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, OutXsize, HIGHLIGHT_NULL)==0 ||
+							SymbolTest(&OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, OutXsize, NULL_IN_PHRASE) == 0) {
+							// if this is null symbol, don't change bit value
+							SymbolCopy(&OutputGroup[GroupAddress], &OutputImage[AddressOut], xsizesymbol, ysizesymbol,
+								OutXsize, OutXsize, 0);
+						}
+						else {
+							SymbolCopy(&OutputGroup[GroupAddress], &OutputImage[AddressOut], xsizesymbol, ysizesymbol,
+								OutXsize, OutXsize, Highlight);
+						}
 					}
 					// clear symbol line for first symbol group
 					for (int k = 0; k < (OutXsize * ysizesymbol); k++) {
-						OutputGroup[k] = 0;
+						if (Highlight == 1) {
+							OutputGroup[k] = HIGHLIGHT_NULL;
+						}
+						else {
+							OutputGroup[k] = 0;
+						}
 					}
 					Sentence++;
 					LengthSymbolGroup = 0;
 					break;
 				}
 				NumSymbols++;
+				// copy special in phrase null value if needed
+				if (Highlight) {
+					GroupAddress = LengthSymbolGroup * xsizesymbol;
+					SymbolSet(&OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, OutXsize, NULL_IN_PHRASE);
+				}
 				LengthSymbolGroup++;
 			}
 			if (i >= TotalInputSymbols) {
@@ -4100,7 +4149,16 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 					int AddressOut;
 						GroupAddress = n * xsizesymbol;
 						AddressOut = (Sentence * OutXsize * ysizesymbol) + GroupAddress;
-						SymbolCopy(&OutputGroup[GroupAddress], &OutputImage[AddressOut], xsizesymbol, ysizesymbol, OutXsize, OutXsize);
+						if (SymbolTest(&OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, OutXsize, HIGHLIGHT_NULL) == 0 ||
+							SymbolTest(&OutputGroup[GroupAddress], xsizesymbol, ysizesymbol, OutXsize, NULL_IN_PHRASE) == 0) {
+							// if this is null symbol, don't change bit value
+							SymbolCopy(&OutputGroup[GroupAddress], &OutputImage[AddressOut], xsizesymbol, ysizesymbol,
+								OutXsize, OutXsize, 0);
+						}
+						else {
+							SymbolCopy(&OutputGroup[GroupAddress], &OutputImage[AddressOut], xsizesymbol, ysizesymbol,
+								OutXsize, OutXsize, Highlight);
+						}
 				}
 			}
 			Sentence++;
@@ -4111,7 +4169,12 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 	delete[] SymbolList;
 
 	ImageHeader.Xsize = OutXsize;
-	ImageHeader.Ysize = OutYsize;
+	if (Highlight == 0) {
+		ImageHeader.Ysize = OutYsize;
+	}
+	else {
+		ImageHeader.Ysize = OutYsize * 2;
+	}
 	ImageHeader.NumFrames = 1;
 
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
@@ -4125,18 +4188,56 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
 
 	// write image
-	for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize); i++) {
-		Pixel.Long = OutputImage[i];
-		if (ImageHeader.PixelSize == 1) {
-			if (Pixel.Long > 255) Pixel.Long = 255;
-			fwrite(&Pixel.Byte, 1, 1, Out);
+	if (Highlight == 0) {
+		for (int i = 0; i < (ImageHeader.Xsize * ImageHeader.Ysize); i++) {
+			Pixel.Long = OutputImage[i];
+			if (ImageHeader.PixelSize == 1) {
+				if (Pixel.Long > 255) Pixel.Long = 255;
+				fwrite(&Pixel.Byte, 1, 1, Out);
+			}
+			else if (ImageHeader.PixelSize == 2) {
+				if (Pixel.Long > 65535) Pixel.Long = 65535;
+				fwrite(&Pixel.Short, 2, 1, Out);
+			}
+			else {
+				fwrite(&Pixel.Long, 4, 1, Out);
+			}
 		}
-		else if (ImageHeader.PixelSize == 2) {
-			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
-		}
-		else {
-			fwrite(&Pixel.Long, 4, 1, Out);
+	}
+	else {
+		int i = 0;
+		for (int y = 0; y < OutYsize;) {
+			for (int j=0; j<ysizesymbol; j++, y++) {
+				for (int x = 0; x < ImageHeader.Xsize; x++, i++) {
+					Pixel.Long = OutputImage[i];
+					if (ImageHeader.PixelSize == 1) {
+						if (Pixel.Long > 255) Pixel.Long = 255;
+						fwrite(&Pixel.Byte, 1, 1, Out);
+					}
+					else if (ImageHeader.PixelSize == 2) {
+						if (Pixel.Long > 65535) Pixel.Long = 65535;
+						fwrite(&Pixel.Short, 2, 1, Out);
+					}
+					else {
+						fwrite(&Pixel.Long, 4, 1, Out);
+					}
+				}
+			}
+			// write blanks between phrases
+			Pixel.Long = HIGHLIGHT_NULL;
+			for (int k = 0; k < OutXsize * ysizesymbol;  k++) {
+				if (ImageHeader.PixelSize == 1) {
+					if (Pixel.Long > 255) Pixel.Long = 255;
+					fwrite(&Pixel.Byte, 1, 1, Out);
+				}
+				else if (ImageHeader.PixelSize == 2) {
+					if (Pixel.Long > 65535) Pixel.Long = 65535;
+					fwrite(&Pixel.Short, 2, 1, Out);
+				}
+				else {
+					fwrite(&Pixel.Long, 4, 1, Out);
+				}
+			}
 		}
 	}
 
@@ -4157,12 +4258,12 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 // Private function
 //
 //******************************************************************************
-int SymbolTest(int* InputImage, int xsize, int ysize, int Yoffset) {
+int SymbolTest(int* InputImage, int xsize, int ysize, int Yoffset,int NullValue) {
 	int Address;
 	for (int y = 0; y < ysize; y++) {
 		Address = Yoffset * y;
 		for (int x = 0; x < xsize; x++) {
-			if (InputImage[Address + x] != 0) {
+			if (InputImage[Address + x] != NullValue) {
 				return 1;
 			}
 		}
@@ -4178,16 +4279,217 @@ int SymbolTest(int* InputImage, int xsize, int ysize, int Yoffset) {
 //
 //******************************************************************************
 void SymbolCopy(int* InputImage, int* OutputImage, int xsize, int ysize,
-				int YoffsetIn, int YoffsetOut) {
+				int YoffsetIn, int YoffsetOut, int Highlight) {
 	int AddressIn;
 	int AddressOut;
 	for (int y = 0; y < ysize; y++) {
 		AddressIn = YoffsetIn * y;
  		AddressOut = YoffsetOut * y;
 		for (int x = 0; x < xsize; x++) {
-			OutputImage[AddressOut + x] = InputImage[AddressIn + x];
+			int Value;
+			Value = InputImage[AddressIn + x];
+			if (Highlight != 0 && Value != 0) {
+				Value = 255;
+			}
+			OutputImage[AddressOut + x] = Value;
 		}
 	}
 	return;
 }
 
+//******************************************************************************
+//
+// SymbolSet, set entire symbol to value
+// 
+// Private function
+//
+//******************************************************************************
+void SymbolSet(int* Image, int xsize, int ysize, int Yoffset, int Value) {
+	int Address;
+	for (int y = 0; y < ysize; y++) {
+		Address = Yoffset * y;
+		for (int x = 0; x < xsize; x++) {
+			Image[Address + x] = Value;
+		}
+	}
+	return;
+}
+
+//******************************************************************************
+//
+// InsertImage
+//
+// This function appends an image file to the right side of the image.
+// The y size of the two file must be the same.  The number of frames in both
+// files must be the same.  The x size of the input files does not have to be
+// the same. The PixelSize does not need to be the same.  The larger of the
+// input image pixel sizes will be used for the the new file. 
+// 
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* InputImageFile	Input image file
+//  WCHAR* ImageInputFile2	This image file is added into the first image.
+//							The alignment is the center of this image
+//							file to Xloc,Yloc in the frist image.
+//	WCHAR* ImageOutputFile	New image file
+// 
+//	int Xloc;
+//	int Yloc;
+//	int InsertAddFlag		0 - add the 2nd image into first image (summed)
+//							1 - Insert the 2nd image into the first image (replacement)
+// 
+//  return value:
+//  1 - Success
+//  !=1 Error see standardized app error list at top of this source file
+//
+//******************************************************************************//******************************************************************************
+int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR* ImageOutputFile,
+				int Xloc, int Yloc, int InsertAddFlag)
+{
+	IMAGINGHEADER InputHeader;
+	IMAGINGHEADER InputHeader2;
+	IMAGINGHEADER OutputHeader;
+	int iRes;
+
+	iRes = ReadImageHeader(ImageInputFile, &InputHeader);
+	if (iRes != 1) {
+		MessageBox(hDlg, L"First image file is not valid", L"Incompatible file type", MB_OK);
+		return iRes;
+	}
+	iRes = ReadImageHeader(ImageInputFile2, &InputHeader2);
+	if (iRes != 1) {
+		MessageBox(hDlg, L"Image file to append is not valid", L"Incompatible file type", MB_OK);
+		return iRes;
+	}
+
+	if (InputHeader.NumFrames != 1 && InputHeader2.NumFrames != 1) {
+		MessageBox(hDlg, L"input files must be single frame", L"Incompatible file type", MB_OK);
+		return 0;
+	}
+
+	memcpy_s(&OutputHeader, sizeof(OutputHeader), &InputHeader, sizeof(InputHeader));
+
+	if (InputHeader.PixelSize > InputHeader2.PixelSize) {
+		OutputHeader.PixelSize = InputHeader.PixelSize;
+	}
+	else {
+		OutputHeader.PixelSize = InputHeader2.PixelSize;
+	}
+
+	int* Image1;
+	int* Image2;
+
+	iRes = LoadImageFile(&Image1, ImageInputFile, &InputHeader);
+	if (iRes != 1) {
+		MessageBox(hDlg, L"Input file read error", L"File I/O error", MB_OK);
+		return iRes;
+	}
+	iRes = LoadImageFile(&Image2, ImageInputFile2, &InputHeader2);
+	if (iRes != 1) {
+		delete[] Image1;
+		MessageBox(hDlg, L"Input file to inset/add read error", L"File I/O error", MB_OK);
+		return iRes;
+	}
+
+	// Any portion of the 2nd image that is outside the bounds of the first image
+	// is ignored.
+
+	int* NewImage;
+	NewImage = new int[(size_t)OutputHeader.Xsize * (size_t)OutputHeader.Ysize];
+	if (NewImage == NULL) {
+		delete[] Image1;
+		delete[] Image2;
+		MessageBox(hDlg, L"Could not allocate output image", L"File I/O", MB_OK);
+		return -1;
+	}
+
+	int Address;
+	//First copy Image1 in the NewImage
+	for (int i = 0; i < OutputHeader.Ysize * OutputHeader.Xsize; i++) {
+		NewImage[i] = Image1[i];
+	}
+	delete[] Image1;
+
+	int OffsetX;
+	int OffsetY;
+	int PixelValue;
+	int TargetX, TargetY;
+	int AddressOut;
+
+	OffsetX = Xloc - InputHeader2.Xsize / 2;
+	OffsetY = Yloc - InputHeader2.Ysize / 2;
+
+	for (int y = 0; y < InputHeader2.Ysize; y++) {
+		TargetY = y + OffsetY;
+		if (TargetY < 0) {
+			continue;
+		}
+		if (TargetY > (OutputHeader.Ysize - 1)) {
+			// past the Y size of the output image
+			break;
+		}
+		Address = y * InputHeader2.Xsize;
+		AddressOut = TargetY * OutputHeader.Xsize;
+
+		for (int x = 0; x < InputHeader2.Xsize; x++) {
+			TargetX = x + OffsetX;
+			if (TargetX < 0) {
+				continue;
+			}
+			if (TargetX > (OutputHeader.Xsize - 1)) {
+				// past the X size of the output image
+				break;
+			}
+			PixelValue = Image2[Address+x];
+			if (InsertAddFlag == 1) {
+				NewImage[AddressOut + TargetX] = PixelValue;
+			}
+			else {
+				PixelValue += NewImage[AddressOut + TargetX];
+				NewImage[AddressOut + TargetX] = PixelValue;
+			}
+		}
+	}
+	delete[] Image2;
+
+	// save results
+	FILE* Out;
+	errno_t ErrNum;
+
+	// write result to output file
+	ErrNum = _wfopen_s(&Out, ImageOutputFile, L"wb");
+	if (Out == NULL) {
+		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
+		return -2;
+	}
+
+	PIXEL Pixel;
+	
+	// save new image header
+	fwrite(&OutputHeader, sizeof(OutputHeader), 1, Out);
+
+	// write image
+	for (int i = 0; i < (OutputHeader.Xsize * OutputHeader.Ysize); i++) {
+		Pixel.Long = NewImage[i];
+		if (OutputHeader.PixelSize == 1) {
+			if (Pixel.Long > 255) Pixel.Long = 255;
+			fwrite(&Pixel.Byte, 1, 1, Out);
+		}
+		else if (OutputHeader.PixelSize == 2) {
+			if (Pixel.Long > 65535) Pixel.Long = 65535;
+			fwrite(&Pixel.Short, 2, 1, Out);
+		}
+		else {
+			fwrite(&Pixel.Long, 4, 1, Out);
+		}
+	}
+
+	fclose(Out);
+	delete[] NewImage;
+
+	if (DisplayResults) {
+		DisplayImage(ImageOutputFile);
+	}
+
+	return 1;
+}

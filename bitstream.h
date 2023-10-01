@@ -2,7 +2,7 @@
 
 void ExtractFromBitStreamText(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int NumBlockHeaderBits, int NumBlockBodyBits, int NumBlocks,
-    int xsize);
+    int xsize, int Invert);
 
 void BitDistance(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize);
 
@@ -18,10 +18,10 @@ void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 
 int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
-    int BitDepth, int BitOrder, int BitScale);
+    int BitDepth, int BitOrder, int BitScale, int Invert);
 
 void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
-    int xsizeEnd, int BitDepth, int BitOrder, int BitScale);
+    int xsizeEnd, int BitDepth, int BitOrder, int BitScale, int Invert);
 
 int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile);
