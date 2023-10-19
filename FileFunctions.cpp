@@ -57,6 +57,7 @@
 //                      Changed, display of 16, 32 bit image data, using scaled BMP file.
 //                      The BMP file is still only a 8bpp file.
 //                      (not applicable to A Sign in Space project)
+// V1.2.8.1 2023-10-18  Add filesize function
 //
 #include "framework.h"
 #include "resource.h"
@@ -1995,4 +1996,34 @@ int CamIRaImport(HWND hWnd)
     fclose(Output);
     fclose(Input);
     return 1;
+}
+
+//****************************************************************
+//
+//  GetFileSize
+// 
+//****************************************************************
+int GetFileSize(WCHAR* szString)
+{
+    int FileSize = 0;
+    int iRes;
+    BYTE Junk;
+    FILE* In;
+    errno_t ErrNum;
+
+    ErrNum = _wfopen_s(&In, szString, L"rb");
+    if (In == NULL) {
+        return -2;
+    }
+
+    while (!feof(In)) {
+        iRes = fread(&Junk, 1, 1, In);
+        if (iRes != 1) {
+            break;
+        }
+        FileSize++;
+    }
+
+    fclose(In);
+    return FileSize;
 }

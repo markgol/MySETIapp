@@ -23,7 +23,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{e84aab53-2c3e-4a3c-99b2-d62e261a7514}</ProjectGuid>
     <RootNamespace>MySETIapp</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -149,6 +149,7 @@
     <ClInclude Include="imaging.h" />
     <ClInclude Include="MySETIapp.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="SPP.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>

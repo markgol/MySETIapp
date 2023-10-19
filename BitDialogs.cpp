@@ -28,6 +28,8 @@
 // V1.2.6.1 2023-09-24  Changed HEX dump, added skip bytes from start of file
 // V1.2.7.1 2023-10-01  Added invert of input bits in bitstream to the bitstream to text and
 //                      bistream to image operations
+// V1.2.8.1 2023-10-16  Added Space protocol Packet extraction from a TM SPP stream file.
+//                      Added filesize to most bit dialogs
 // 
 // Bit tools dialog box handlers
 // 
@@ -70,6 +72,16 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         GetPrivateProfileString(L"BitHexDumpDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
+        // get filesize
+        int FileSize;
+        FileSize = GetFileSize(szString);
+        if (FileSize >= 0) {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+        }
+
         GetPrivateProfileString(L"BitHexDumpDlg", L"TextOutput", L"data17-hex.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
@@ -102,6 +114,17 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             CoTaskMemFree(pszFilename);
             
             SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            // get filesize
+            int FileSize;
+            FileSize = GetFileSize(szString);
+            if (FileSize >= 0) {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+            }
+
             return (INT_PTR)TRUE;
         }
         case IDC_TEXT_OUTPUT_BROWSE:
@@ -189,6 +212,16 @@ INT_PTR CALLBACK BitTextStreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
         GetPrivateProfileString(L"BitTextStreamDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
+        // get filesize
+        int FileSize;
+        FileSize = GetFileSize(szString) * 8;
+        if (FileSize >= 0) {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+        }
+
         GetPrivateProfileString(L"BitTextStreamDlg", L"TextOutput", L"data17.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
@@ -237,6 +270,17 @@ INT_PTR CALLBACK BitTextStreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
                 CoTaskMemFree(pszFilename);
             }
             SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            // get filesize
+            int FileSize;
+            FileSize = GetFileSize(szString) * 8;
+            if (FileSize >= 0) {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+            }
+
             return (INT_PTR)TRUE;
         }
         case IDC_TEXT_OUTPUT_BROWSE:
@@ -351,6 +395,16 @@ INT_PTR CALLBACK BitExtractDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         GetPrivateProfileString(L"BitExtractDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
+        // get filesize
+        int FileSize;
+        FileSize = GetFileSize(szString) * 8;
+        if (FileSize >= 0) {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+        }
+
         GetPrivateProfileString(L"BitExtractDlg", L"TextOutput", L"extracted.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
@@ -386,6 +440,17 @@ INT_PTR CALLBACK BitExtractDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
                 CoTaskMemFree(pszFilename);
             }
             SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            // get filesize
+            int FileSize;
+            FileSize = GetFileSize(szString) * 8;
+            if (FileSize >= 0) {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+            }
+
             return (INT_PTR)TRUE;
         }
         case IDC_TEXT_OUTPUT_BROWSE:
@@ -472,6 +537,16 @@ INT_PTR CALLBACK BitDistancesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         GetPrivateProfileString(L"BitDistancesDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
+        // get filesize
+        int FileSize;
+        FileSize = GetFileSize(szString) * 8;
+        if (FileSize >= 0) {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+        }
+
         GetPrivateProfileString(L"BitDistancesDlg", L"TextOutput", L"data17-bit-distances.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
@@ -500,6 +575,17 @@ INT_PTR CALLBACK BitDistancesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
                 CoTaskMemFree(pszFilename);
             }
             SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            // get filesize
+            int FileSize;
+            FileSize = GetFileSize(szString) * 8;
+            if (FileSize >= 0) {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+            }
+
             return (INT_PTR)TRUE;
         }
         case IDC_TEXT_OUTPUT_BROWSE:
@@ -574,6 +660,16 @@ INT_PTR CALLBACK BitSequencesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         GetPrivateProfileString(L"BitSequencesDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
+        // get filesize
+        int FileSize;
+        FileSize = GetFileSize(szString) * 8;
+        if (FileSize >= 0) {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+        }
+
         GetPrivateProfileString(L"BitSequencesDlg", L"TextOutput", L"data17-bit-sequences.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
@@ -602,6 +698,17 @@ INT_PTR CALLBACK BitSequencesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
                 CoTaskMemFree(pszFilename);
             }
             SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            // get filesize
+            int FileSize;
+            FileSize = GetFileSize(szString) * 8;
+            if (FileSize >= 0) {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+            }
+
             return (INT_PTR)TRUE;
         }
         case IDC_TEXT_OUTPUT_BROWSE:
@@ -676,6 +783,16 @@ INT_PTR CALLBACK BitStatsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
         GetPrivateProfileString(L"BitStatsDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
+        // get filesize
+        int FileSize;
+        FileSize = GetFileSize(szString) * 8;
+        if (FileSize >= 0) {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+        }
+
         GetPrivateProfileString(L"BitStatsDlg", L"TextOutput", L"data17-stats.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
 
@@ -712,6 +829,18 @@ INT_PTR CALLBACK BitStatsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
                 CoTaskMemFree(pszFilename);
             }
             SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            // get filesize
+            // IDC_FILESIZE
+            int FileSize;
+            FileSize = GetFileSize(szString) * 8;
+            if (FileSize >= 0) {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+            }
+
             return (INT_PTR)TRUE;
         }
         case IDC_TEXT_OUTPUT_BROWSE:
@@ -988,6 +1117,17 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
         GetPrivateProfileString(L"BitImageDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+        
+        // get filesize
+        // IDC_FILESIZE
+        int FileSize;
+        FileSize = GetFileSize(szString) * 8;
+        if (FileSize >= 0) {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+        }
 
         GetPrivateProfileString(L"BitImageDlg", L"ImageOutput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
@@ -1058,6 +1198,18 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
                 CoTaskMemFree(pszFilename);
             }
             SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            // get filesize
+            // IDC_FILESIZE
+            int FileSize;
+            FileSize = GetFileSize(szString) * 8;
+            if (FileSize >= 0) {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+            }
+
             return (INT_PTR)TRUE;
         }
         case IDC_IMAGE_OUTPUT_BROWSE:
@@ -1285,6 +1437,200 @@ INT_PTR CALLBACK Text2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 
             GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString, MAX_PATH);
             WritePrivateProfileString(L"Text2StreamDlg", L"BinaryOutput", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
+// Message handler for ExtractSPPDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK ExtractSPPDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        int Strict;
+        int SaveSPP;
+
+        GetPrivateProfileString(L"ExtractSPPDlg", L"BinaryInput", L"encap_001.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+        GetPrivateProfileString(L"ExtractSPPDlg", L"APIDOutput", L"APID-xxx.csv", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_TEXT_OUTPUT2, szString);
+
+        GetPrivateProfileString(L"ExtractSPPDlg", L"SummaryOutput", L"SPP summary.csv", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
+
+        GetPrivateProfileString(L"ExtractSPPDlg", L"APID", L"17", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_APID, szString);
+
+        GetPrivateProfileString(L"ExtractSPPDlg", L"SkipBytes", L"10", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_SKIP_BYTES, szString);
+
+        GetPrivateProfileString(L"ExtractSPPDlg", L"SecondaryHeaderSize", L"10", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_HEADER2SIZE, szString);
+
+        Strict = GetPrivateProfileInt(L"ExtractSPPDlg", L"Strict", 0, (LPCTSTR)strAppNameINI);
+        if (!Strict) {
+            CheckDlgButton(hDlg, IDC_STRICT, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_STRICT, BST_CHECKED);
+        }
+
+        SaveSPP = GetPrivateProfileInt(L"ExtractSPPDlg", L"SaveSPP", 1, (LPCTSTR)strAppNameINI);
+        if (!SaveSPP) {
+            CheckDlgButton(hDlg, IDC_SAVE_SUMMARY, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_SAVE_SUMMARY, BST_CHECKED);
+        }
+
+        return (INT_PTR)TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            COMDLG_FILTERSPEC AllType[] =
+            {
+                 { L"bit stream files", L"*.bin" },
+                 { L"image files", L"*.raw" },
+                 { L"BMP files", L"*.bmp" },
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, szString, MAX_PATH);
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 5, AllType, L".bin")) {
+                return (INT_PTR)TRUE;
+            }
+            wcscpy_s(szString, pszFilename);
+            CoTaskMemFree(pszFilename);
+
+            SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+        case IDC_TEXT_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"csv files", L"*.csv" },
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 3, textType, L".csv")) {
+                return (INT_PTR)TRUE;
+            }
+            wcscpy_s(szString, pszFilename);
+            CoTaskMemFree(pszFilename);
+
+            SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_TEXT_OUTPUT2_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT2, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"csv files", L"*.csv" },
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 3, textType, L".csv")) {
+                return (INT_PTR)TRUE;
+            }
+            wcscpy_s(szString, pszFilename);
+            CoTaskMemFree(pszFilename);
+
+            SetDlgItemText(hDlg, IDC_TEXT_OUTPUT2, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_EXTRACT:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            WCHAR APIDoutputFile[MAX_PATH];
+            int APID;
+            int SkipBytes;
+            int SecondaryHeaderSize;
+            int Strict = 0;
+            int SaveSPP = 0;
+
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT2, APIDoutputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, OutputFile, MAX_PATH);
+
+            APID = GetDlgItemInt(hDlg, IDC_APID, &bSuccess, TRUE);
+            SkipBytes = GetDlgItemInt(hDlg, IDC_SKIP_BYTES, &bSuccess, TRUE);
+            SecondaryHeaderSize = GetDlgItemInt(hDlg, IDC_HEADER2SIZE, &bSuccess, TRUE);
+            if (IsDlgButtonChecked(hDlg, IDC_STRICT) == BST_CHECKED) {
+                Strict = 1;
+            }
+            if (IsDlgButtonChecked(hDlg, IDC_SAVE_SUMMARY) == BST_CHECKED) {
+                SaveSPP = 1;
+            }
+
+            ExtractSPP(hDlg, InputFile, APIDoutputFile, OutputFile, APID, SkipBytes,
+                SecondaryHeaderSize, Strict, SaveSPP);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSPPDlg", L"BinaryInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT2, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSPPDlg", L"APIDOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSPPDlg", L"SummaryOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_APID, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSPPDlg", L"APID", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_SKIP_BYTES, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSPPDlg", L"SkipBytes", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_HEADER2SIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractSPPDlg", L"SecondaryHeaderSize", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_STRICT) == BST_CHECKED) {
+                WritePrivateProfileString(L"ExtractSPPDlg", L"Strict", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ExtractSPPDlg", L"Strict", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_SAVE_SUMMARY) == BST_CHECKED) {
+                WritePrivateProfileString(L"ExtractSPPDlg", L"SaveSPP", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ExtractSPPDlg", L"SaveSPP", L"0", (LPCTSTR)strAppNameINI);
+            }
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;

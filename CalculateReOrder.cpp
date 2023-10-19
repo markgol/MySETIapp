@@ -16,6 +16,11 @@
 //
 // V1.2.6.1 2023-09-24	Initial release
 // V1.2.7.1 2023-10-01	No actual changes, skeleton added for addtional 5 algorithms
+// V1.2.8.1 2023-10-18	Added 4 new algorithms to reorder using algorithm
+//							Incremental row shoft with wrap aorund
+//							n Stripes
+//							Shift (rotate) Rows
+//							Shift (rotate) Columns 
 // 
 //*******************************************************************************
 #include "CalculateReOrder.h"
@@ -25,10 +30,10 @@ int CalcQuad_UL_LL_UR_LR_l2r_t2b(int x, int y, int Xsize, int Ysize);
 int CalcQuad_LL_UL_LR_UR_l2r_t2b(int x, int y, int Xsize, int Ysize);
 int CalcQuad_LL_LR_UL_UR_l2r_t2b(int x, int y, int Xsize, int Ysize);
 int CalcQuad_UL_UR_LL_LR_center_out(int x, int y, int Xsize, int Ysize);
-int NewAlg1(int x, int y, int Xsize, int Ysize);
-int NewAlg2(int x, int y, int Xsize, int Ysize);
-int NewAlg3(int x, int y, int Xsize, int Ysize);
-int NewAlg4(int x, int y, int Xsize, int Ysize);
+int CalcRotateRow(int x, int y, int Xsize, int Ysize, int P1);
+int StripesP1(int x, int y, int Xsize, int Ysize, int P1);
+int CalcShiftRow(int x, int y, int Xsize, int Ysize, int P1);
+int CalcShiftCol(int x, int y, int Xsize, int Ysize, int P1);
 int NewAlg5(int x, int y, int Xsize, int Ysize);
 
 //******************************************************************************
@@ -48,7 +53,7 @@ int NewAlg5(int x, int y, int Xsize, int Ysize);
 //						1	resize image
 //
 //*******************************************************************************
-int CalculateReOrder(int x, int y, int Xsize, int Ysize, int Algorithm, int* ResizeFlag)
+int CalculateReOrder(int x, int y, int Xsize, int Ysize, int Algorithm, int P1, int P2, int* ResizeFlag)
 {
 	int Address;
 
@@ -87,28 +92,29 @@ int CalculateReOrder(int x, int y, int Xsize, int Ysize, int Algorithm, int* Res
 		Address = CalcQuad_UL_UR_LL_LR_center_out(x, y, Xsize, Ysize);
 		break;
 
-	case 6: // not yet implemented
-		// from Quadrant UL, UR, LL, LR, left to right, top to bottom, no resize
-		(*ResizeFlag) = -1;
-		Address = NewAlg1(x, y, Xsize, Ysize);
+	case 6:
+		// Incrmentally rotate rows by P1
+		Address = CalcRotateRow(x, y, Xsize, Ysize, P1);
 		break;
 
-	case 7: // not yet implemented
-		// from Quadrant UL,LL,UR,LR, left to right, top to bottom, no resize
-		(*ResizeFlag) = -1;
-		Address = NewAlg2(x, y, Xsize, Ysize);
+	case 7:
+		// Image in stripes, P1 wide
+		if (Xsize % P1 != 0) {
+			(*ResizeFlag) = -1; // flag error
+			break;
+		}
+		Address = StripesP1(x, y, Xsize, Ysize, P1);
 		break;
 
-	case 8: // not yet implemented
-		// from Quadrant LL,UL,LR,UR, left to right, top to bottom, no resize
-		(*ResizeFlag) = -1;
-		Address = NewAlg3(x, y, Xsize, Ysize);
+	case 8: 
+		// circular shift rows by P1
+		Address = CalcShiftRow(x, y, Xsize, Ysize, P1);
+		break;
 		break;
 
-	case 9: // not yet implemented
-		//from Quadrant LL,LR,UL,UR, left to right, top to bottom, no resize
-		(*ResizeFlag) = -1;
-		Address = NewAlg4(x, y, Xsize, Ysize);
+	case 9: 
+		// circular shift rows by P1
+		Address = CalcShiftCol(x, y, Xsize, Ysize, P1);
 		break;
 
 	case 10: // not yet implemented
@@ -283,11 +289,21 @@ int CalcQuad_UL_UR_LL_LR_center_out(int x, int y, int Xsize, int Ysize) {
 
 //******************************************************************************
 //
-// NewAlg1
+// CalcRotateRow
 // 
 //******************************************************************************
-int NewAlg1(int x, int y, int Xsize, int Ysize) {
+int CalcRotateRow(int x, int y, int Xsize, int Ysize, int P1) {
 	int Address;
+
+	x = x + (P1 * y);
+	
+	while (x < 0) {
+		x = x + Xsize;
+	}
+	
+	while (x >= Xsize) {
+		x = x - Xsize;
+	}
 
 	Address = x + (y * Xsize);
 	return Address;
@@ -295,41 +311,69 @@ int NewAlg1(int x, int y, int Xsize, int Ysize) {
 
 //******************************************************************************
 //
-// NewAlg2
+// StripesP1
 // 
 //******************************************************************************
-int NewAlg2(int x, int y, int Xsize, int Ysize) {
+int StripesP1(int x, int y, int Xsize, int Ysize, int P1) {
 	int Address;
+	int Stripe;
+	int StripeWidth;
+	int StripePixel;
+	int Offset;
 
-	Address = x + (y * Xsize);
+	StripeWidth = Xsize / P1;
+	Stripe = x / StripeWidth;
+	StripePixel = x % StripeWidth;
+
+	Offset = StripePixel * P1 + Stripe;
+
+	Address = Offset + (y * Xsize);
 
 	return Address;
 }
 
 //******************************************************************************
 //
-// NewAlg3
+// CalcShiftRow
 // 
 //******************************************************************************
-int NewAlg3(int x, int y, int Xsize, int Ysize) {
+int CalcShiftRow(int x, int y, int Xsize, int Ysize,int P1) {
 	int Address;
 
-	Address = x + (y * Xsize);
+	x = x + P1;
 
-	return Address;
+	while (x < 0) {
+		x = x + Xsize;
+	}
+
+	while (x >= Xsize) {
+		x = x - Xsize;
+	}
+
+	Address = x + (y * Xsize);
+	return Address;	return Address;
 }
 
 //******************************************************************************
 //
-// NewAlg4
+// CalcShiftCol
 // 
 //******************************************************************************
-int NewAlg4(int x, int y, int Xsize, int Ysize) {
+int CalcShiftCol(int x, int y, int Xsize, int Ysize, int P1) {
 	int Address;
 
-	Address = x + (y * Xsize);
+	y = y + P1;
 
-	return Address;
+	while (y < 0) {
+		y = y + Ysize;
+	}
+
+	while (y >= Ysize) {
+		y = y - Ysize;
+	}
+
+	Address = x + (y * Xsize);
+	return Address;	return Address;
 }
 
 //******************************************************************************

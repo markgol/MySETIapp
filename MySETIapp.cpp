@@ -106,6 +106,26 @@
 //                      Correction, 2d symbol extraction requires image y size to be
 //						divisible by y symbol size.
 //						Changed, block symbol extraction to allow highlighting phrases
+// V1.2.8.1 2023-10-15  Added input2 image file information to dialog for Append end image operation
+//                      Changed, Append image end, no longer requires Ysize to be the same 
+//                      unless the frames are being added to the end of the first input image.
+//                      Added Space protocol Packet extraction from a TM SPP stream file.
+//                      Changed bit sequence report to also include 0s as a sequence.
+//                      Changed Add/subtract constant to be add/subract/multiply/divide constant operation
+//                      Added, Export Image to bitstream file
+//                      Changed,  Add filesize to most bit stream operation dialogs
+//                      Added 4 new algorithms to reorder using algorithm
+//						    Incremental row shoft with wrap aorund
+//						    n Stripes
+//						    Shift (rotate) Rows
+//						    Shift (rotate) Columns
+//                      Correction, 16 bit image pixels were being treated as signed instead of unsigned
+//                          in certain circumstances.
+//                      Correction,  reshource.h files to stop ID value are not duplicated.  Duplication
+//                          of ID numbers is somehting the resource editor automatically does and requires
+//                          occsional cleanup to keep upwanted GUI actions and oompilation errors from occuring
+//                          This included checking that a resource ID does not get assigned 65535, this is reserved
+//                          for IDC_STATIC as -1 (ID #is 16 bits) 
 //
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -201,11 +221,13 @@ INT_PTR CALLBACK    ResizeDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    GlobalSettingsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Text2StreamDlg(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    AddConstantDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    MathConstantDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    StdDecimationDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ReplicationDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ReorderAlgDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    InsertImageDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    ExtractSPPDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    Image2StreamDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -483,8 +505,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_BITTOOLS_BINARYIMAGE:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_BINARYIMAGE), hWnd, BitImageDlg);
                 break;
-            
-            // Image tools menu
+
+            case IDM_BITTOOLS_SPP_EXTRACT:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_SPP_EXTRACT), hWnd, ExtractSPPDlg);
+                break;
+
+// Image tools menu
             case IDM_IMGTOOLS_PROPERTIES:
             {
                 PWSTR pszFilename;
@@ -504,6 +530,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 }
                 break;
             }
+
+            case IDM_IMAGETOOLS_EXPORTBITSTREAM:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_IMAGE2STREAM), hWnd, Image2StreamDlg);
+                break;
 
             case IDM_IMGTOOLS_EXTRACT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_EXTRACT), hWnd, ExtractImageDlg);
@@ -589,8 +619,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_RESIZE), hWnd, ResizeDlg);
                 break;
 
-            case IDM_ADDSUBTRACT_CONSTANT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_ADD_CONSTANT), hWnd, AddConstantDlg);
+            case IDM_MATH_CONSTANT:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_MATH_CONSTANT), hWnd, MathConstantDlg);
                 break;
                 
             case IDM_IMAGETOOLS_REPLICATION:

@@ -54,6 +54,12 @@
 //						Changed block symbol extraction to allow highlighting phrases
 //						Phrase is output using 0, 255 for symbol data, 25 for null symbols
 //						between symbols in a phrase and 40 for null symbols not in the phrase
+// V1.2.8.1 2023-10-16  Added second input image file information for Append end image operation
+//                      Changed, Append image end no longer requires Ysize to be the same 
+//                      unless the frames are being added to the end of the first input image.
+//                      Changed, AddSubractConstant to MathConstant, now does +, *, or /
+//						Fixed, 16 bit image should have been USHORT not SHORT
+//						Added convert image file to bitstream
 //
 #include "framework.h"
 #include "stdio.h"
@@ -183,7 +189,7 @@ int LoadImageFile(int** ImagePtr, WCHAR* ImagingFilename, IMAGINGHEADER* Header)
 				Pixel.Byte[0] = Pixel.Byte[1];
 				Pixel.Byte[1] = swap;
 			}
-			Image[i] = (int)Pixel.Short;
+			Image[i] = (int)Pixel.uShort;
 		}
 		else {
 			if (!Endian) {
@@ -537,7 +543,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 			Image[i] = (int)Pixel.Byte[0];
 		}
 		else if (InputHeader.PixelSize == 2) {
-			Image[i] = (int)Pixel.Short;
+			Image[i] = (int)Pixel.uShort;
 		}
 		else {
 			// Pixel size is 4
@@ -647,9 +653,9 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 			}
 		}
 		else if (OutputHeader.PixelSize == 2) {
-			Pixel.Short = Image[Address];
-			if (ScaleBinary && Pixel.Short != 0) {
-				Pixel.Short = 255;
+			Pixel.uShort = Image[Address];
+			if (ScaleBinary && Pixel.uShort != 0) {
+				Pixel.uShort = 255;
 			}
 		}
 		else {
@@ -679,9 +685,10 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 // must be the same for both image files.  The PixelSize does not need to be the
 // same.  The larger of the input image pixel sizes will be used for the the
 // new file.  You can choose to append frames in the files frame by frame.
-// This makes the y image size twice as large in the output image file.
-// Otherwise the frames form the second file are added onto the end for
-// the first file.
+// The output image Ysize is input1 Ysize + input2 Ysize.
+// Otherwise, the frames fromm the second file are added onto the end for
+// the first file. (Ysize must be the same for both input images).
+// Xsize must be the same for both inpu images.
 // 
 // Parameters:
 //	HWND hDlg				Handle of calling window or dialog
@@ -715,8 +722,13 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 		MessageBox(hDlg, L"Image file to append is not valid", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
-	if (InputHeader.Xsize != InputHeader2.Xsize || InputHeader.Ysize != InputHeader2.Ysize) {
-		MessageBox(hDlg, L"Input files are not the same image size", L"Incompatible file type", MB_OK);
+	if (InputHeader.Xsize != InputHeader2.Xsize) {
+		MessageBox(hDlg, L"Input files need to have the same x size", L"Incompatible file type", MB_OK);
+		return -5;
+	}
+
+	if (IncrFrames && InputHeader.Ysize != InputHeader2.Ysize) {
+		MessageBox(hDlg, L"Input files need to have the same y size", L"Incompatible file type", MB_OK);
 		return -5;
 	}
 
@@ -725,7 +737,7 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 			L"Incompatible file type", MB_OK);
 		return -5;
 	}
-
+	
 	memcpy_s(&OutputHeader, sizeof(OutputHeader), &InputHeader, sizeof(InputHeader));
 
 	if (IncrFrames) {
@@ -734,8 +746,9 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 	}
 	else {
 		// frame by frame append (i.e frame1 file 1 + frame1 File2, frame3 file 1 + frame3 File2, ...) 
-		OutputHeader.Ysize = InputHeader.Ysize * 2;
+		OutputHeader.Ysize = InputHeader.Ysize + InputHeader2.Ysize;
 	}
+
 	if (InputHeader.PixelSize > InputHeader2.PixelSize) {
 		OutputHeader.PixelSize = InputHeader.PixelSize;
 	}
@@ -791,8 +804,8 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 				PixelValue = Image1[j + Offset];
 				fwrite(&PixelValue, OutputHeader.PixelSize, 1, Out);
 			}
-			// Xsize and Ysize are same for both input images
-			for (int j = 0; j < InputHeader.Xsize * InputHeader.Ysize; j++) {
+			// Xsize is the same for both input images but Ysize may be different
+			for (int j = 0; j < InputHeader.Xsize * InputHeader2.Ysize; j++) {
 				PixelValue = Image2[j + Offset];
 				fwrite(&PixelValue, OutputHeader.PixelSize, 1, Out);
 			}
@@ -1245,8 +1258,14 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 
 	iFormat = fscanf_s(TextIn, "%d,%d,%d", DecomXsize, DecomYsize, &LinearFormat);
 	if (iFormat != 2 && iFormat != 3) {
-		fclose(TextIn);
-		return -4;
+		// it is possible if the file was written by Excel as csv it will have 3 extra characters at the start
+		// which will cause the fscanf to fail
+		fseek(TextIn, 3, SEEK_SET);
+		iFormat = fscanf_s(TextIn, "%d,%d,%d", DecomXsize, DecomYsize, &LinearFormat);
+		if (iFormat != 2 && iFormat != 3) {
+			fclose(TextIn);
+			return -4;
+		}
 	}
 	if (((*DecomXsize) * (*DecomYsize)) <= 0) {
 		return -4;
@@ -1580,7 +1599,7 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 				}
 				else if (ImageHeader.PixelSize == 2) {
 					if (Pixel.Long > 65535) Pixel.Long = 65535; // clip output
-					fwrite(&Pixel.Short, 2, 1, Out);
+					fwrite(&Pixel.uShort, 2, 1, Out);
 				}
 				else {
 					fwrite(&Pixel.Long, 4, 1, Out);
@@ -1743,7 +1762,7 @@ int FoldImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColum
 				}
 				else if (ImageHeader.PixelSize == 2) {
 					if (Pixel.Long > 65535) Pixel.Long = 65535; // clip output
-					fwrite(&Pixel.Short, 2, 1, Out);
+					fwrite(&Pixel.uShort, 2, 1, Out);
 				}
 				else {
 					fwrite(&Pixel.Long, 4, 1, Out);
@@ -1892,7 +1911,7 @@ int FoldImageDown(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 				}
 				else if (ImageHeader.PixelSize == 2) {
 					if (Pixel.Long > 65535) Pixel.Long = 65535; // clip output
-					fwrite(&Pixel.Short, 2, 1, Out);
+					fwrite(&Pixel.uShort, 2, 1, Out);
 				}
 				else {
 					fwrite(&Pixel.Long, 4, 1, Out);
@@ -2041,7 +2060,7 @@ int FoldImageUp(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 				}
 				else if (ImageHeader.PixelSize == 2) {
 					if (Pixel.Long > 65535) Pixel.Long = 65535; // clip output
-					fwrite(&Pixel.Short, 2, 1, Out);
+					fwrite(&Pixel.uShort, 2, 1, Out);
 				}
 				else {
 					fwrite(&Pixel.Long, 4, 1, Out);
@@ -2188,7 +2207,7 @@ int AccordionImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Accor
 		}
 		else if (ImageHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535; // clip output
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -2336,7 +2355,7 @@ int AccordionImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Acco
 		}
 		else if (ImageHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535; // clip output
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -2422,7 +2441,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
 						fwrite(&Pixel.Byte, 1, 1, Out);
 					}
 					else if (ImageHeader.PixelSize == 2) {
-						fwrite(&Pixel.Short, 2, 1, Out);
+						fwrite(&Pixel.uShort, 2, 1, Out);
 					}
 					else {
 						fwrite(&Pixel.Long, 4, 1, Out);
@@ -2444,7 +2463,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
 					fwrite(&Pixel.Byte, 1, 1, Out);
 				}
 				else if (ImageHeader.PixelSize == 2) {
-					fwrite(&Pixel.Short, 2, 1, Out);
+					fwrite(&Pixel.uShort, 2, 1, Out);
 				}
 				else {
 					fwrite(&Pixel.Long, 4, 1, Out);
@@ -2461,7 +2480,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
 				fwrite(&Pixel.Byte, 1, 1, Out);
 			}
 			else if (ImageHeader.PixelSize == 2) {
-				fwrite(&Pixel.Short, 2, 1, Out);
+				fwrite(&Pixel.uShort, 2, 1, Out);
 			}
 			else {
 				fwrite(&Pixel.Long, 4, 1, Out);
@@ -2607,7 +2626,7 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 			fwrite(&Pixel.Byte, 1, 1, Out);
 		}
 		else if (ImageHeader.PixelSize == 2) {
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -2793,7 +2812,7 @@ int AddSubtractImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* Out
 		}
 		else if (Input1Header.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -2921,7 +2940,7 @@ int RotateImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 		}
 		else if (ImageHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -3042,7 +3061,7 @@ int MirrorImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 		}
 		else if (ImageHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -3129,7 +3148,7 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 		}
 		else if (ImageHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -3186,7 +3205,7 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 //
 //*******************************************************************************
 int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize,
-	int Algorithm)
+	int Algorithm, int P1, int P2)
 {
 	int* InputImage;
 	int ResizeFlag;
@@ -3197,7 +3216,7 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 
 	LoadImageFile(&InputImage, InputFile, &ImageHeader);
 
-	CalculateReOrder(0, 0, Xsize, Ysize, Algorithm, &ResizeFlag);
+	CalculateReOrder(0, 0, Xsize, Ysize, Algorithm, P1, P2, &ResizeFlag);
 	if (ResizeFlag < 0) {
 		return 0;
 	}
@@ -3233,7 +3252,7 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 		for (int y = 0; y < ImageHeader.Ysize; y++) {
 			for (int x = 0; x < ImageHeader.Xsize; x++) {
 				Address = Offset + CalculateReOrder(x, y, ImageHeader.Xsize, ImageHeader.Ysize,
-											Algorithm, &ResizeFlag);
+											Algorithm, P1, P2, &ResizeFlag);
 				Pixel.Long = InputImage[Address];
 				if (ImageHeader.PixelSize == 1) {
 					if (Pixel.Long > 255) Pixel.Long = 255;
@@ -3241,7 +3260,7 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 				}
 				else if (ImageHeader.PixelSize == 2) {
 					if (Pixel.Long > 65535) Pixel.Long = 65535;
-					fwrite(&Pixel.Short, 2, 1, Out);
+					fwrite(&Pixel.uShort, 2, 1, Out);
 				}
 				else {
 					fwrite(&Pixel.Long, 4, 1, Out);
@@ -3451,7 +3470,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 		}
 		else if (ImageHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -3574,7 +3593,7 @@ int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile,
 		}
 		else if (ImageHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -3596,7 +3615,8 @@ int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile,
 // AddConstant2Image
 // 
 //******************************************************************************
-int AddConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value)
+int MathConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value,
+						int Operation, int Warn, int *ArithmeticFlag)
 {
 	int iRes;
 	int* InputImage;
@@ -3605,6 +3625,7 @@ int AddConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value)
 	PIXEL Pixel;
 	FILE* Out;
 	IMAGINGHEADER InputHeader;
+	if (Warn) *ArithmeticFlag = 0;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &InputHeader);
 	if (iRes != 1) {
@@ -3618,8 +3639,25 @@ int AddConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value)
 	}
 
 	for (int i = 0; i < (InputHeader.Xsize * InputHeader.Ysize * InputHeader.NumFrames); i++) {
-		OutputImage[i] = InputImage[i] + Value;
-		if (OutputImage[i] < 0) OutputImage[i] = 0;
+		switch (Operation) {
+		case 0: // add/subtract
+			OutputImage[i] = InputImage[i] + Value;
+		default:
+			break;
+
+		case 1: // multiply
+			OutputImage[i] = InputImage[i] * Value;
+			break;
+
+		case 2: // divide
+			OutputImage[i] = InputImage[i] / Value;
+			break;
+		}
+
+		if (OutputImage[i] < 0) {
+			OutputImage[i] = 0;
+			if(Warn) *ArithmeticFlag = 1;
+		}
 	}
 
 	delete[] InputImage;
@@ -3637,12 +3675,18 @@ int AddConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value)
 	for (int i = 0; i < (InputHeader.Xsize * InputHeader.Ysize * InputHeader.NumFrames); i++) {
 		Pixel.Long = OutputImage[i];
 		if (InputHeader.PixelSize == 1) {
-			if (Pixel.Long > 255) Pixel.Long = 255;
+			if (Pixel.Long > 255) {
+				Pixel.Long = 255;
+				if (Warn) *ArithmeticFlag = 1;
+			}
 			fwrite(&Pixel.Byte, 1, 1, Out);
 		}
 		else if (InputHeader.PixelSize == 2) {
-			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			if (Pixel.Long > 65535) {
+				Pixel.Long = 65535;
+				if (Warn) *ArithmeticFlag = 1;
+			}
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -3759,7 +3803,7 @@ int ReplicateImage(WCHAR* InputFile, WCHAR* OutputFile,
 		}
 		else if (ImageHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -3953,7 +3997,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 			}
 			else if (ImageHeader.PixelSize == 2) {
 				if (Pixel.Long > 65535) Pixel.Long = 65535;
-				fwrite(&Pixel.Short, 2, 1, TempFile);
+				fwrite(&Pixel.uShort, 2, 1, TempFile);
 			}
 			else {
 				fwrite(&Pixel.Long, 4, 1, TempFile);
@@ -4197,7 +4241,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 			}
 			else if (ImageHeader.PixelSize == 2) {
 				if (Pixel.Long > 65535) Pixel.Long = 65535;
-				fwrite(&Pixel.Short, 2, 1, Out);
+				fwrite(&Pixel.uShort, 2, 1, Out);
 			}
 			else {
 				fwrite(&Pixel.Long, 4, 1, Out);
@@ -4216,7 +4260,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 					}
 					else if (ImageHeader.PixelSize == 2) {
 						if (Pixel.Long > 65535) Pixel.Long = 65535;
-						fwrite(&Pixel.Short, 2, 1, Out);
+						fwrite(&Pixel.uShort, 2, 1, Out);
 					}
 					else {
 						fwrite(&Pixel.Long, 4, 1, Out);
@@ -4232,7 +4276,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 				}
 				else if (ImageHeader.PixelSize == 2) {
 					if (Pixel.Long > 65535) Pixel.Long = 65535;
-					fwrite(&Pixel.Short, 2, 1, Out);
+					fwrite(&Pixel.uShort, 2, 1, Out);
 				}
 				else {
 					fwrite(&Pixel.Long, 4, 1, Out);
@@ -4477,7 +4521,7 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 		}
 		else if (OutputHeader.PixelSize == 2) {
 			if (Pixel.Long > 65535) Pixel.Long = 65535;
-			fwrite(&Pixel.Short, 2, 1, Out);
+			fwrite(&Pixel.uShort, 2, 1, Out);
 		}
 		else {
 			fwrite(&Pixel.Long, 4, 1, Out);
@@ -4490,6 +4534,163 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 	if (DisplayResults) {
 		DisplayImage(ImageOutputFile);
 	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
+// Image2Stream
+// 
+//	A bitstream is a bit by bit representation. 
+//	While an image file has 8, 16 or 32 bits per pixel this does not mean the data extent
+//	for a pixel is 8, 16 or 32.  An image pixel may represent a only binary value (0 or 1) or a
+//	limited number of bits per pixel.  When exporting an image to a bit stream the number of bits
+//	per pixel must be specified.  Also a bitstream may be positive or negative for bits which
+//	the user must specify whether the bit output to the bit stream be inverted.
+// 
+// Limitations:
+//	Writing to a file must always be done in bytes (octets, 8 bits per byte).  The routine will pad
+//	the last byte even though the data may only partially fill the last byte.
+// 
+//	Including the header includes the image header without applying any kind of bit erversal or bit
+//	inversion.
+// 
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* InputFile	Input image file
+//	WCHAR* OutputFile	Output bitstream file
+// 
+//	int BitDepth;		0 - set to pixel size from header
+//						n - number of bits to export from pixel in input file
+//						<0	error
+//						>32	error
+// 
+//	int Frames;			0 - Use number of frames from input file header
+//						n - Number of frames, if n > input image number of frames then
+//							n is changed to number of frames in inpout file
+//						<0	Error
+// 
+//	int Header;			0 - do not output input header
+//						1 - save input header in output file
+// 
+//	int BitOrder;		0 - MSB to LSB (normal order)
+//						1 - LSB toMSB (reverse bit order)
+//						Note: The bit order when the bit depth is 1 has no affect on the output
+//						i.e. the bit order is the same either direction when BitDepth == 1
+// 
+//	int Invert;			0 - do not invert bits in output file
+//						1 - invert bits in output file
+// 
+//  return value:
+//  1 - Success
+//  !=1 Error see standardized app error list at top of this source file
+//
+//******************************************************************************//******************************************************************************
+int Image2Stream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitDepth, int Frames, int Header, int BitOrder, int Invert)
+{
+	IMAGINGHEADER InputHeader;
+	int iRes;
+	int* InputImage;
+	int NumFrames;
+
+	iRes = LoadImageFile(&InputImage, InputFile, &InputHeader);
+	if (iRes != 1) {
+		MessageBox(hDlg, L"Input file is not image file", L"Incompatible file type", MB_OK);
+		return iRes;
+	}
+
+	if (BitDepth > InputHeader.PixelSize * 8) {
+		MessageBox(hDlg, L"Bit Depth is larger than image file pixel size", L"Bad Parameters", MB_OK);
+		return 0;
+	}
+
+	if (BitDepth > 32 || BitDepth < 0) {
+		MessageBox(hDlg, L"0 <= Bit Depth <= 32", L"Bad Parameters", MB_OK);
+		return 0;
+	}
+
+	if (BitDepth == 0) {
+		BitDepth = InputHeader.PixelSize * 8;
+	}
+
+	if (Frames < 0) {
+		MessageBox(hDlg, L"Number of frames must be >=0", L"Bad Parameters", MB_OK);
+		return 0;
+	}
+
+	if (Frames == 0) {
+		NumFrames = InputHeader.NumFrames;
+	}
+	else {
+		NumFrames = Frames;
+		if (NumFrames > InputHeader.NumFrames) {
+			NumFrames = InputHeader.NumFrames;
+		}
+	}
+
+	FILE* Out;
+	errno_t ErrNum;
+	PIXEL Pixel;
+	int Offset;
+	BYTE SingleByte = 0;
+	int SingleBit;
+	int BitPosition;
+
+	//write output image
+	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+	if (Out == NULL) {
+		delete[] InputImage;
+		return -2;
+	}
+
+	// write out header if Header is TRUE
+	if (Header) {
+		fwrite(&InputHeader, sizeof(InputHeader), 1, Out);
+	}
+
+	BitPosition = 0;
+
+	for (int Frame = 0; Frame < NumFrames; Frame++) {
+		for (int y = 0; y < InputHeader.Ysize; y++) {
+			Offset = (Frame * InputHeader.Xsize * InputHeader.Ysize) + (y * InputHeader.Xsize);
+			for (int x = 0; x < InputHeader.Xsize; x++) {
+				Pixel.Long = InputImage[Offset + x];
+				for (int Bit = 0; Bit < BitDepth; Bit++) {
+					if (!BitOrder) {
+						SingleBit = Pixel.Long & 1 << Bit;
+					}
+					else {
+						SingleBit = Pixel.Long & 1 << (BitDepth - Bit);
+					}
+					if (SingleBit!=0) {
+						SingleByte = SingleByte | (1 << (7-BitPosition));
+					}
+					BitPosition++;
+					if (BitPosition >= 8) {
+						if (Invert) {
+							SingleByte = ~SingleByte;
+						}
+						fwrite(&SingleByte, 1, 1, Out);
+						BitPosition = 0;
+						SingleByte = 0;
+					}
+				}
+			}
+		}
+	}
+
+	//
+	// write padded last byte out to file
+	if (SingleByte != 0) {
+		if (Invert) {
+			SingleByte = ~SingleByte;
+		}
+		fwrite(&SingleByte, 1, 1, Out);
+	}
+
+	fclose(Out);
+	delete[] InputImage;
 
 	return 1;
 }

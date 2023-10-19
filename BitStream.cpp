@@ -37,6 +37,8 @@
 // V1.2.7.1 2023-10-01  Added invert of input bits in bitstream to the bitstream to text and
 //                      bistream to image operations: ExtractFromBitStreamText() and
 //                      BitStream2Image(), BatchBitStream2Image()
+// V1.2.8.1 2023-10-5   Added SPP extraction from a TM SPP stream file.
+//                      Changed, Bit sequences report to include 0 sequences.
 //
 #include "framework.h"
 #include <windowsx.h>
@@ -386,14 +388,18 @@ void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize)
 {
     FILE* In;
     FILE* Out;
+    errno_t ErrNum;
     int CurrentBit = 0;
     int CurrentPrologueBit = 0;
     int CurrentByteBit = 0;
-    errno_t ErrNum;
-    int NumOnes = 0;;
-    int LastOne = -1;
+    int NumOnes = 0;
+    int NumZeros = 0;
     int LastBit = 0;
     int BitCounter = 0;
+    int OneLength = 0;
+    int ZeroLength = 0;
+    int NumSequences = 0;
+    int CurrentState = 0; // 0 - this is first bit in file, 1 - counting 1 sequence, 2 counting 0 sequence
 
     ErrNum = _wfopen_s(&In, InputFile, L"rb");
     if (In==NULL) {
@@ -407,6 +413,8 @@ void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize)
         MessageBox(hDlg, L"Could not open text output file", L"File I/O", MB_OK);
         return;
     }
+
+    fprintf(Out, "  Seq#,Bit, length\n");
 
     while (!feof(In)) {
         char CurrentByte;
@@ -423,39 +431,99 @@ void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize)
         // process data bit by bit in the order of the bit transmission message
         // input file is byte oriented MSB to LSB representing the bit order that the message was received
         // This does not imply any bit ordering in the message itself.
+
         while (CurrentByteBit < 8) {
             // skip Prologue bits
             if (CurrentBit < SkipSize) {
                 CurrentByteBit++;
                 CurrentBit++;
                 continue;
-            } else if (CurrentBit == SkipSize) {
-                LastOne = CurrentBit - 1;
             }
 
+            // current bit
             BitValue = CurrentByte & (0x80 >> CurrentByteBit);
-            if (BitValue) {
-                NumOnes++;
-                LastOne = CurrentBit;
-                BitCounter++;
-            } else {
-                if (LastBit) {
-                    // This is the end of bit sequence
-                    fprintf(Out, "%5d,%5d\n", CurrentBit - (SkipSize + BitCounter), BitCounter);
-                    BitCounter = 0;
+
+            // process this bit
+            // possible states:
+            //      first bit
+            //      counting zeros
+            //      counting ones
+            // 
+            switch (CurrentState) {
+            case 0:
+            {
+                if (BitValue) {
+                    CurrentState = 1;
+                    NumOnes = 1;
+                    OneLength = 1;
                 }
+                else {
+                    CurrentState = 2;
+                    NumZeros = 1;
+                    ZeroLength = 1;
+                }
+                break;
             }
-            LastBit = BitValue;
+
+            case 1:
+            {
+                if (BitValue) {
+                    // another 1
+                    NumOnes++;
+                    OneLength++;
+                    break;
+                }
+
+                // this is a 0, so change states
+                // save result of 1 sequence
+                NumSequences++;
+                fprintf(Out, "%6d, 1 ,%6d\n", NumSequences, OneLength);
+                ZeroLength = 1;
+                NumZeros++;
+                CurrentState = 2;
+                break;
+            }
+
+            case 2:
+            {
+                if (BitValue == 0) {
+                    // another 0
+                    NumZeros++;
+                    ZeroLength++;
+                    break;
+                }
+
+                // this is a 1, so change states
+                // save result of 0 sequence
+                NumSequences++;
+                fprintf(Out, "%6d, 0 ,%6d\n", NumSequences, ZeroLength);
+                OneLength = 1;
+                NumOnes++;
+                CurrentState = 1;
+                break;
+            }
+
+            default:
+                // should never get here
+                break;
+            };
 
             CurrentByteBit++;
             CurrentBit++;
         }
     }
-    if (BitCounter) {
-        fprintf(Out, "%5d,%5d\n", CurrentBit - (SkipSize + BitCounter), BitCounter);
+
+    // save last state results
+    if (CurrentState==1) {
+        NumSequences++;
+        fprintf(Out, "%6d, 1 ,%6d\n", NumSequences, OneLength);
+    }
+    else if (CurrentState == 2) {
+        NumSequences++;
+        fprintf(Out, "%6d, 0 ,%6d\n", NumSequences, OneLength);
     }
 
-    fprintf(Out, "Number of ones: %5d\n", NumOnes);
+    fprintf(Out, "Number of ones: %5d\nNumber of Zeros: %5d\n#sequences: %5d", NumOnes, NumZeros,NumSequences);
     fclose(In);
     fclose(Out);
 
@@ -1297,4 +1365,330 @@ int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
     fclose(In);
     fclose(Out);
     return 1;
+}
+
+//*******************************************************************
+//
+// ExtractSPP
+// 
+// Extract SPP from input stream
+// The input to this is a SPP binary stream.  The stream SPP headers 
+// are decoded.  IDLE packets are discarded. If SaveSPP is enabled then
+// a summary file of all the non IDLE packets is saved without
+// the data fields si saved.  The target APID SPPs in the summary file
+// have *** at the end of end line.  If Strict flag is set then the primary
+// header must be in complete conformance with the ESCC standards, ECSS-E-ST-70-41C
+// or ECSS-E-70-41A.  A file for the spcified APID is saved.  This contains each
+// target APID SPPs in the source file including the Primary header field decoded
+// along with the packet data field which contains the secondary header, user data,
+// and CRC/checksum in HEX coded bytes.
+// 
+// Parameters:
+//  HWND hDlg               handle of calling window/dialog
+//  WCHAR* InputFile        Packed Binary bit stream file
+//  WCHAR* OutputFile       CSV file with SPps of the selected APID
+//  int APID                APID to look for
+//  int SkipBytes           Number of byte in input file to initially skip
+//  int SecondaryHeaderSize The number of bytes to skip (the secondary header)
+//                          at the start of the data field.
+//  int strict              0 - only basic check for conforming to standards
+//                          1 - must comply with the packet primary header standards
+//  int SaveSPP             0 - do not save summary file
+//                          1 - SPP summary file
+//
+//*******************************************************************
+int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* OutputFile,
+    int APID, int SkipBytes, int SecondaryHeaderSize,
+    int Strict, int SaveSPP) {
+
+    SPP_UNPACKED_PRIMARY_HEADER PriHeader;
+    SPP_PRIMARY_HEADER PackedPriHeader;
+    FILE* In = NULL;
+    FILE* Out = NULL;
+    FILE* OutAPID = NULL;
+    int iRes;
+    int NumPackets = 0;
+    int NumIdlePackets = 0;
+    int NumTMpackets = 0;
+    int NumTCpackets = 0;
+    int NumAPIDmatches = 0;
+    int TotalBytes = 0;
+    errno_t ErrNum;
+
+    // open input file
+    ErrNum = _wfopen_s(&In, InputFile, L"rb");
+    if (In == NULL) {
+        MessageBox(hDlg, L"Could not open input file", L"File I/O", MB_OK);
+        return -2;
+    }
+    if (fseek(In, SkipBytes, SEEK_SET) != 0) {
+        fclose(In);
+        MessageBox(hDlg, L"bad format, file, too small\nNot likely SPP binary file", L"File I/O", MB_OK);
+        return -3;
+    }
+
+    if (SaveSPP) {
+        // open output summary file
+        ErrNum = _wfopen_s(&Out, OutputFile, L"w");
+        if (Out == NULL) {
+            fclose(In);
+            MessageBox(hDlg, L"Could not open summary output file", L"File I/O", MB_OK);
+            return -2;
+        }
+        fprintf(Out, "   SPP#, PVN, Type, SHflag,   APID, SeqFlg, SeqCount, DataLen, Data Field ->\n");
+    }
+
+    ErrNum = _wfopen_s(&OutAPID, APIDoutputFile, L"w");
+    if (OutAPID == NULL) {
+        if (SaveSPP) {
+            fclose(Out);
+        }
+        fclose(In);
+        MessageBox(hDlg, L"Could not open APID output file", L"File I/O", MB_OK);
+        return -2;
+    }
+
+    fprintf(OutAPID, "   SPP#, PVN, Type, SHflag,   APID, SeqFlg, SeqCount, DataLen, Data Field ->\n");
+
+    while (!feof(In)) {
+        iRes = fread(&PackedPriHeader, sizeof(PackedPriHeader), 1, In);
+        if (iRes != 1) {
+            if (NumPackets == 0) {
+                MessageBox(hDlg, L"Input file is wrong type", L"File I/O error", MB_OK);
+                if (SaveSPP) {
+                    fclose(Out);
+                }
+                fclose(OutAPID);
+                fclose(In);
+                return -3;
+            }
+            // generate summary
+            TCHAR pszMessageBuf[MAX_PATH];
+            StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+                TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
+                NumPackets, NumIdlePackets,NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
+            MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+            if (SaveSPP) {
+                fclose(Out);
+            }
+            fclose(In);
+            fclose(OutAPID);
+            return 1;
+        }
+
+        // SPP header read
+        TotalBytes += 6;
+
+        PackedPriHeader.ID = ByteSwap(PackedPriHeader.ID);
+        PackedPriHeader.SEQ = ByteSwap(PackedPriHeader.SEQ);
+        PackedPriHeader.DataLength = ByteSwap(PackedPriHeader.DataLength);
+
+        iRes = DecodeSPP(&PackedPriHeader, &PriHeader,Strict);
+        if (iRes == 0) {
+            MessageBox(hDlg, L"Invalid SPP encountered", L"File I/O", MB_OK);
+            TCHAR pszMessageBuf[MAX_PATH];
+            StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+                TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
+                NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
+            MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+            if (SaveSPP) {
+                fclose(Out);
+            }
+            fclose(OutAPID);
+            fclose(In);
+            return 0;
+        }
+
+        // add SPP data field length, this includes secondary header, user data, and CRC/checksum
+        TotalBytes += PriHeader.DataLength;
+
+        NumPackets++;
+        if (PriHeader.Type == 1) {
+            NumTCpackets++;
+        }
+        else {
+            NumTMpackets++;
+        }
+        if (PriHeader.APID == 0x7ff) {
+            // This is an IDLE packet,skip
+            NumIdlePackets++;
+            if (fseek(In, PriHeader.DataLength, SEEK_CUR) != 0) {
+                if (SaveSPP) {
+                    fclose(Out);
+                }
+                fclose(OutAPID);
+                fclose(In);
+                MessageBox(hDlg, L"Incomplete packet encountered\nEOF before end of packet", L"File I/O", MB_OK);
+                TCHAR pszMessageBuf[MAX_PATH];
+                StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+                    TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
+                    NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
+                MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+                return -3;
+            }
+            continue;
+        }
+        if (SaveSPP) {
+            fprintf(Out, "%7d,   %1d,    %1d,      %1d, 0x%04x,      %1d,    %5d,   %5d", NumPackets,
+                PriHeader.PVN, PriHeader.Type, PriHeader.SecHeaderFlag, PriHeader.APID,
+                PriHeader.SeqFlag, PriHeader.SeqCount, PriHeader.DataLength);
+        }
+
+        if (APID != PriHeader.APID) {
+            if (SaveSPP) {
+                fprintf(Out, "\n");
+            }
+            if (fseek(In, PriHeader.DataLength, SEEK_CUR) != 0) {
+                if (SaveSPP) {
+                    fclose(Out);
+                }
+                fclose(OutAPID);
+                fclose(In);
+                MessageBox(hDlg, L"bad format, file, too small", L"File I/O", MB_OK);
+                TCHAR pszMessageBuf[MAX_PATH];
+                StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+                    TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
+                    NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
+                MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+                return -3;
+            }
+            continue;
+        }
+        // found correct APID
+        NumAPIDmatches++;
+        if (SaveSPP) {
+            fprintf(Out, ", ***\n"); // flag target APID SPP in summary file
+        }
+
+        fprintf(OutAPID, "%7d,   %1d,    %1d,      %1d, 0x%04x,      %1d,    %5d,   %5d", NumPackets,
+            PriHeader.PVN, PriHeader.Type, PriHeader.SecHeaderFlag, PriHeader.APID,
+            PriHeader.SeqFlag, PriHeader.SeqCount, PriHeader.DataLength);
+
+        // read data field
+        {
+            unsigned char* DataField;
+            int iRes;
+
+            DataField = new unsigned char[PriHeader.DataLength];
+            if (DataField == NULL) {
+                delete[] DataField;
+                if (SaveSPP) {
+                    fclose(Out);
+                }
+                fclose(OutAPID);
+                fclose(In);
+                MessageBox(hDlg, L"Memory allocation failure", L"Program error", MB_OK);
+                TCHAR pszMessageBuf[MAX_PATH];
+                StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+                    TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
+                    NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
+                MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+                return -3;
+            }
+            
+            iRes = fread(DataField, 1, PriHeader.DataLength, In);
+            if (iRes != PriHeader.DataLength) {
+                delete[] DataField;
+                if (SaveSPP) {
+                    fclose(Out);
+                }
+                fclose(OutAPID);
+                fclose(In);
+                MessageBox(hDlg, L"Packet data field too short", L"File I/O", MB_OK);
+                TCHAR pszMessageBuf[MAX_PATH];
+                StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+                    TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
+                    NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
+                MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+                return -3;
+            }
+
+            // skip sepcifed number of bytes at the beginning of the data field, nominally the secondary header
+            for (int i = SecondaryHeaderSize; i < PriHeader.DataLength; i++) {
+                fprintf(OutAPID, ", %02x", (int)DataField[i]);
+            }
+            fprintf(OutAPID, "\n");
+
+            delete[] DataField;
+        }
+    }
+
+    TCHAR pszMessageBuf[MAX_PATH];
+    StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+        TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
+        NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
+    MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+
+    if (SaveSPP) {
+        fclose(Out);
+    }
+    fclose(OutAPID);
+    fclose(In);
+
+    return 1;
+}
+
+//*******************************************************************
+//
+//  DecodeSPP
+// 
+// Private function for ExtractSPP()
+//
+//*******************************************************************
+int DecodeSPP(SPP_PRIMARY_HEADER* PackedPriHeader, SPP_UNPACKED_PRIMARY_HEADER* PriHeader,
+            int Strict)
+{
+    PriHeader->PVN = (PackedPriHeader->ID & 0xe000) >> 13 ;
+
+    PriHeader->Type = (PackedPriHeader->ID & 0x1000) >>12;
+
+    PriHeader->SecHeaderFlag = (PackedPriHeader->ID & 0x0800) >> 11;
+
+    PriHeader->APID = PackedPriHeader->ID & 0x7ff;
+
+    PriHeader->SeqFlag = (PackedPriHeader->SEQ & 0xc000) >>14;
+
+    PriHeader->SeqCount = PackedPriHeader->SEQ & 0x3fff;
+
+    PriHeader->DataLength = PackedPriHeader->DataLength+1; // need to increment by 1 to be accurate
+
+    if (PriHeader->PVN != 0) {
+        return 0;
+    }
+
+    // strict application of ECSS-E-ST-70-41C or otherwise only apply CCSDS 133.0-B-1
+    if (!Strict) {
+        return 1;
+    }
+
+    // flag incorrect settings in SPP primary header
+
+    // Almost all telemtry packets have a packet secondary header, IDLE and time packets do not
+    if (PriHeader->Type == 0 && PriHeader->SecHeaderFlag != 1) {
+        // IDLE packets and spacecraft time packets do not have secondary header
+        if (PriHeader->APID != 0x7ff && PriHeader->APID !=0x000) {
+            return 0;
+        }
+    }
+    if (PriHeader->SeqFlag != 3) {
+        return 0;
+    }
+
+    return 1;
+}
+
+//*******************************************************************
+//
+//  ByteSwap
+//
+//*******************************************************************
+uint16_t ByteSwap(uint16_t Value) {
+    uint16_t LowByte;
+    uint16_t HighByte;
+    uint16_t NewValue;
+    LowByte = Value & 0x00ff;
+    HighByte = (Value & 0xff00) >> 8;
+
+    NewValue = HighByte | (LowByte << 8);
+    return NewValue;
 }

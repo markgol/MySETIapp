@@ -42,6 +42,9 @@
     <ClInclude Include="CalculateReOrder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SPP.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MySETIapp.cpp">
