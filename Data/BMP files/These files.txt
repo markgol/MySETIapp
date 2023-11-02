@@ -1,0 +1,8 @@
+A_B_C_D_E.bmp
+This is a bitmap file of the possible 5 signs displayed in a linear arrangement.
+
+Message.bmp
+This is a bitmap file of the message body as a 256x256 image
+
+SignABCcolor.bmp
+This RGB (Red, Green Blue) is color representation of the sign A,B,B aligned together

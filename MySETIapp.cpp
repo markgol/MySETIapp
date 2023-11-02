@@ -126,7 +126,15 @@
 //                          occsional cleanup to keep upwanted GUI actions and oompilation errors from occuring
 //                          This included checking that a resource ID does not get assigned 65535, this is reserved
 //                          for IDC_STATIC as -1 (ID #is 16 bits) 
-//
+// V1.2.9.1 2023-10-31  Added, remove NULL bytes from bitstream file
+//                      Changed, added histogram of byte values in bitstream file stats report
+//                      Changed, Reordering by algorithm, add MxN Block [P1,P2] output decom
+//						Changed, Reordering by algorithm, Added 3rd parameter (P3) (for future use)
+//                      Changed, Reordering by algorithm, Add Invert algorithm option.
+//                      Correction, bug in extract image operation cortrected when extracted image
+//						    was larger in the vertical direction than the source image.
+//						Added,  batch input file list for reordering operation. Batch file has both input filename and output filename
+// 
 // MySETIapp.cpp : Defines the entry point for the application.
 //
 //  This appliction stores user parameters in a Windows style .ini file
@@ -228,6 +236,8 @@ INT_PTR CALLBACK    ReorderAlgDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    InsertImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ExtractSPPDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Image2StreamDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    RemoveNULLsDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    ReorderImageBatchDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -470,6 +480,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 break;
 
             // Bit tools menu
+            case IDM_BITTOOLS_REMOVENULLS:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_REMOVENULLS), hWnd, RemoveNULLsDlg);
+                break;
+
             case IDM_BITTOOLS_TEXT_STREAM:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_BITTOOLS_TEXT_STREAM), hWnd, BitTextStreamDlg);
                 break;
@@ -557,6 +571,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case IDM_IMGTOOLS_REORDER:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_REORDER), hWnd, ReorderImageDlg);
+                break;
+
+            case IDM_IMGTOOLS_REORDER_BATCH:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_REORDER_BATCH), hWnd, ReorderImageBatchDlg);
                 break;
 
             case IDM_IMAGETOOLS_REORDER_ALG:

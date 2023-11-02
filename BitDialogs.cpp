@@ -30,6 +30,7 @@
 //                      bistream to image operations
 // V1.2.8.1 2023-10-16  Added Space protocol Packet extraction from a TM SPP stream file.
 //                      Added filesize to most bit dialogs
+// V1.2.9.1 2023-10-31  Added, removal of NULL bytes from bitstream file dialog
 // 
 // Bit tools dialog box handlers
 // 
@@ -55,6 +56,153 @@
 #include "imaging.h"
 
 // Add new callback prototype declarations in my MySETIapp.cpp
+
+//*******************************************************************************
+//
+// Message handler for BitHexDump dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK RemoveNULLsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+        GetPrivateProfileString(L"RemoveNULLsDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+        // get filesize
+        int FileSize;
+        FileSize = GetFileSize(szString);
+        if (FileSize >= 0) {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"RemoveNULLsDlg", L"BinaryOutput", L"data17-NoNULLs.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString);
+
+        GetPrivateProfileString(L"RemoveNULLsDlg", L"SkipBytes", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_SKIP_BYTES, szString);
+
+        GetPrivateProfileString(L"RemoveNULLsDlg", L"NULLvalue", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_NULLVALUE, szString);
+
+        GetPrivateProfileString(L"RemoveNULLsDlg", L"NullLength", L"1", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_NULL_LENGTH, szString);
+
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            COMDLG_FILTERSPEC AllType[] =
+            {
+                 { L"bit stream files", L"*.bin" },
+                 { L"image files", L"*.raw" },
+                 { L"BMP files", L"*.bmp" },
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, szString, MAX_PATH);
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 5, AllType, L".bin")) {
+                return (INT_PTR)TRUE;
+            }
+            wcscpy_s(szString, pszFilename);
+            CoTaskMemFree(pszFilename);
+            
+            SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
+
+            // get filesize
+            int FileSize;
+            FileSize = GetFileSize(szString);
+            if (FileSize >= 0) {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, FileSize, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_FILESIZE, 0, TRUE);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+        case IDC_BINARY_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"text files", L"*.bin" },
+                 { L"All Files", L"*.*" },
+            };
+
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, textType, L".txt")) {
+                return (INT_PTR)TRUE;
+            }
+            wcscpy_s(szString, pszFilename);
+            CoTaskMemFree(pszFilename);
+          
+            SetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_CONVERT:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int NULLvalue;
+            int SkipBytes;
+            int NullLength;
+
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, OutputFile, MAX_PATH);
+
+            NULLvalue = GetDlgItemInt(hDlg, IDC_NULLVALUE, &bSuccess, TRUE);
+            NullLength = GetDlgItemInt(hDlg, IDC_NULL_LENGTH, &bSuccess, TRUE);
+            SkipBytes = GetDlgItemInt(hDlg, IDC_SKIP_BYTES, &bSuccess, TRUE);
+
+            if (NullLength <= 0) {
+                MessageBox(hDlg, L"Null length must be > 0", L"Invalid Parmeter", MB_OK);
+                return (INT_PTR)TRUE;
+            }
+
+            RemoveNULLbytes(hDlg, InputFile, OutputFile, NULLvalue, NullLength, SkipBytes);
+            
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_BINARY_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"RemoveNULLsDlg", L"BinaryInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"RemoveNULLsDlg", L"BinaryOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_NULL_LENGTH, szString, MAX_PATH);
+            WritePrivateProfileString(L"RemoveNULLsDlg", L"NullLength", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_NULLVALUE, szString, MAX_PATH);
+            WritePrivateProfileString(L"RemoveNULLsDlg", L"NULLvalue", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_SKIP_BYTES, szString, MAX_PATH);
+            WritePrivateProfileString(L"RemoveNULLsDlg", L"SkipBytes", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
 
 //*******************************************************************************
 //
@@ -112,7 +260,7 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             }
             wcscpy_s(szString, pszFilename);
             CoTaskMemFree(pszFilename);
-            
+
             SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
             // get filesize
@@ -142,7 +290,7 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             }
             wcscpy_s(szString, pszFilename);
             CoTaskMemFree(pszFilename);
-          
+
             SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
             return (INT_PTR)TRUE;
         }
@@ -162,7 +310,7 @@ INT_PTR CALLBACK BitHexDumpDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             SkipBytes = GetDlgItemInt(hDlg, IDC_SKIP_BYTES, &bSuccess, TRUE);
 
             FileHexDump(hDlg, InputFile, OutputFile, xsize, SkipBytes);
-            
+
             return (INT_PTR)TRUE;
         }
 

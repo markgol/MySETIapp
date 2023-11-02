@@ -60,7 +60,11 @@
 //                      Changed, AddSubractConstant to MathConstant, now does +, *, or /
 //						Fixed, 16 bit image should have been USHORT not SHORT
 //						Added convert image file to bitstream
-//
+// V1.2.9.1	2023-10-31	Correction, bug in extract image operation cortrected when extracted image
+//						was larger in the vertical direction than the source image.
+//						Added batch input file list for reordering operation. Batch file has both input filename and output filename
+//						Changed, Added 3rd parameter (P3) to ReorderAlg(), CalculateReOrder()
+//						Changed, 'Redorder by algorithm' now includes Invert algorithm flag
 #include "framework.h"
 #include "stdio.h"
 #include "wchar.h"
@@ -579,7 +583,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 		InputOffset = CurrentFrame * InputFrameSize;
 		for (int i = 0, y = Starty; i < SubimageYsize; i++, y++) {
 			if (y < 0) continue;
-			if (y > InputHeader.Ysize) break;
+			if (y >= InputHeader.Ysize) break;
 			SubAddress = i * SubimageXsize + InputOffset;
 			Address = y * InputHeader.Xsize + OutputOffset;
 			for (int j = 0, x = Startx; j < SubimageXsize; j++, x++, SubAddress++) {
@@ -1209,9 +1213,10 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 			}
 		}
 		fclose(Out);
-		if (GenerateBMP) {
+		if (EnableBatch && GenerateBMP) {
 			SaveBMP(BMPfilename, NewFilename, FALSE, TRUE);
 		}
+
 	}
 	delete[] DecomY;
 	delete[] DecomX;
@@ -3193,9 +3198,10 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 //	HWND hDlg				Handle of calling window or dialog
 //	WCHAR* InputFile		Image file to sum next wnext file
 //	WCHAR* OutputFile		Reordered image file
-//	int Xsize				New x size (width)
-//	int Ysize				New y size (length)
+//	int Xsize				New x size (width) (0 - use input X size)
+//	int Ysize				New y size (length) (0 - use input Y size)
 //	int PixelSize			New Pixel size in bytes (must be 1,2 or 4)
+//							0 - use input file pixel size for output file
 //	int Algorithm			Algorithm to use for reordering
 //							0 - don't reorder (sill apply new sizes if needed)
 //  return value:
@@ -3205,7 +3211,7 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 //
 //*******************************************************************************
 int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize,
-	int Algorithm, int P1, int P2)
+	int Algorithm, int P1, int P2, int P3, int Invert)
 {
 	int* InputImage;
 	int ResizeFlag;
@@ -3215,8 +3221,14 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 	FILE* Out;
 
 	LoadImageFile(&InputImage, InputFile, &ImageHeader);
+	if (Xsize == 0) {
+		Xsize = ImageHeader.Xsize;
+	}
+	if (Ysize == 0) {
+		Ysize = ImageHeader.Ysize;
+	}
 
-	CalculateReOrder(0, 0, Xsize, Ysize, Algorithm, P1, P2, &ResizeFlag);
+	CalculateReOrder(0, 0, Xsize, Ysize, Algorithm, P1, P2, P3, &ResizeFlag);
 	if (ResizeFlag < 0) {
 		return 0;
 	}
@@ -3234,6 +3246,36 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 		ImageHeader.PixelSize = PixelSize;
 	}
 
+	// reorder image
+	// 
+
+	int Offset;
+	int Address;
+	int OutOffset;
+	int* OutputImage;
+
+	OutputImage = new int[(size_t)ImageHeader.Xsize * (size_t)ImageHeader.Ysize * (size_t)ImageHeader.NumFrames];
+
+	for (int Frame = 0; Frame < ImageHeader.NumFrames; Frame++) {
+		Offset = Frame * ImageHeader.Xsize * ImageHeader.Ysize;
+		for (int y = 0; y < ImageHeader.Ysize; y++) {
+			OutOffset = y * ImageHeader.Xsize + Offset;
+			for (int x = 0; x < ImageHeader.Xsize; x++) {
+				Address = Offset + CalculateReOrder(x, y, ImageHeader.Xsize, ImageHeader.Ysize,
+					Algorithm, P1, P2, P3, &ResizeFlag);
+				if (!Invert) {
+					OutputImage[OutOffset + x] = InputImage[Address];
+				}
+				else {
+					// inverse of reorder algorithm
+					OutputImage[Address] = InputImage[OutOffset + x];
+				}
+			}
+		}
+	}
+	delete[] InputImage;
+
+
 	// write out new image file
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
@@ -3245,15 +3287,12 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
 
 	// write image
-	int Offset;
-	int Address;
 	for (int Frame=0; Frame < ImageHeader.NumFrames; Frame++) {
 		Offset = Frame * ImageHeader.Xsize * ImageHeader.Ysize;
 		for (int y = 0; y < ImageHeader.Ysize; y++) {
+			OutOffset = y * ImageHeader.Xsize + Offset;
 			for (int x = 0; x < ImageHeader.Xsize; x++) {
-				Address = Offset + CalculateReOrder(x, y, ImageHeader.Xsize, ImageHeader.Ysize,
-											Algorithm, P1, P2, &ResizeFlag);
-				Pixel.Long = InputImage[Address];
+				Pixel.Long = OutputImage[OutOffset+x];
 				if (ImageHeader.PixelSize == 1) {
 					if (Pixel.Long > 255) Pixel.Long = 255;
 					fwrite(&Pixel.Byte, 1, 1, Out);
@@ -3269,7 +3308,7 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 		}
 	}
 	fclose(Out);
-	delete[] InputImage;
+	delete[] OutputImage;
 
 	if (DisplayResults) {
 		DisplayImage(OutputFile);
@@ -4692,5 +4731,155 @@ int Image2Stream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitDepth, i
 	fclose(Out);
 	delete[] InputImage;
 
+	return 1;
+}
+
+//******************************************************************************
+//
+//
+//
+//******************************************************************************
+int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePixel, int Lineaer, int EnableBatch, int GenerateBMP)
+{
+	// Text input is a list of filename pairs
+	// input image file
+	// output image file
+	// blank lines are ignored
+	FILE* BatchFile;
+	errno_t ErrNum;
+	int iRes;
+	WCHAR* wRes;
+	int iLine = 0;
+	int iProcessed = 0;
+	int Found = 0;
+	WCHAR InputImageFile[MAX_PATH];
+	WCHAR OutputImageFile[MAX_PATH];
+
+	ErrNum = _wfopen_s(&BatchFile, InputFile, L"r");
+	if (BatchFile == NULL) {
+		MessageBox(hDlg, L"Could not open input batch file", L"File error", MB_OK);
+		return -2;
+	}
+	while (!feof(BatchFile)) {
+
+		// read possible input image filename
+		wRes = fgetws(InputImageFile, MAX_PATH, BatchFile);
+		if (wRes == NULL) {
+			if (iLine == 0) {
+				MessageBox(hDlg, L"Empty batch file", L"Nothing to process", MB_OK);
+				fclose(BatchFile);
+				return 0;
+			}
+			break;
+		}
+		if (StringBlankorComnent(InputImageFile, MAX_PATH)) {
+			// skip blank lines
+			iLine++;
+			continue;
+		}
+		iRes = wcslen(InputImageFile);
+		if (iRes > 0) {
+			if (InputImageFile[iRes - 1] == '\n') {
+				// remove newline from string
+				InputImageFile[iRes - 1] = '\0';
+				iRes = iRes - 1;
+			}
+		}
+		iLine++;
+
+		// input image filename was found
+		// now read output image filename
+		Found = 0;
+		while (!feof(BatchFile)) {
+			wRes = fgetws(OutputImageFile, MAX_PATH, BatchFile);
+			if (wRes == NULL) {
+				break;
+			}
+			iLine++;
+			if (!StringBlankorComnent(OutputImageFile, MAX_PATH)) {
+				// found non blank line
+				Found = 1;
+				break;
+			}
+		}
+		if (Found) {
+			iRes = wcslen(OutputImageFile);
+			if (iRes > 0) {
+				if (OutputImageFile[iRes - 1] == '\n') {
+					// remove newline from string
+					OutputImageFile[iRes - 1] = '\0';
+					iRes = iRes - 1;
+				}
+			}
+		}
+		else {
+			// there was nothing more in the file
+			MessageBox(hDlg, L"Missing output image filename\nCheck Batch file", L"Missing filename", MB_OK);
+			break;
+		}
+
+		// we have file pair to process
+		int SaveDisplayResults;
+		SaveDisplayResults = DisplayResults;
+		DisplayResults = 0;
+		iRes = PixelReorder(hDlg, TextInput, InputImageFile, OutputImageFile, ScalePixel, FALSE, EnableBatch, GenerateBMP);
+		DisplayResults = SaveDisplayResults;
+		if (iRes != 1) {
+			break;
+		}
+		if (!EnableBatch && GenerateBMP) {
+			// need to generate a BMP file for the output file
+			// create bmp file from wOutputImageFile name
+			{
+				//parse for just filename
+				WCHAR BMPfilename[MAX_PATH];
+				int err;
+				WCHAR Drive[_MAX_DRIVE];
+				WCHAR Dir[_MAX_DIR];
+				WCHAR Fname[_MAX_FNAME];
+				WCHAR Ext[_MAX_EXT];
+
+				// split apart original filename
+				err = _wsplitpath_s(OutputImageFile, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+					_MAX_FNAME, Ext, _MAX_EXT);
+				if (err == 0) {
+					err = _wmakepath_s(BMPfilename, _MAX_PATH, Drive, Dir, Fname, L".bmp");
+					if (err == 0) {
+						SaveBMP(BMPfilename, OutputImageFile, FALSE, ScalePixel);
+					}
+				}
+			}
+		}
+
+		iProcessed++;
+	}
+	fclose(BatchFile);
+	
+	{
+		TCHAR pszMessageBuf[MAX_PATH];
+		StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
+			TEXT("Batch Image reordering results\n# of image processed: %d\n"),
+			iProcessed);
+		MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
+	}
+	return 1;
+}
+
+//************************************************************************************
+//
+//
+//
+//************************************************************************************
+int StringBlankorComnent(WCHAR* Line,int LineSize)
+{
+	int iLen;
+	iLen = wcslen(Line);
+	if (iLen == 0) return 1;
+	for (int i = 0; i < iLen; i++) {
+		if (Line[i] == '/' || Line[i] == ';' || Line[i] == ':') {
+			return 1;
+		}
+		if (!iswspace(Line[i])) return 0;
+	}
 	return 1;
 }

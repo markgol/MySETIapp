@@ -20,7 +20,9 @@
 //							Incremental row shoft with wrap aorund
 //							n Stripes
 //							Shift (rotate) Rows
-//							Shift (rotate) Columns 
+//							Shift (rotate) Columns
+// V1.2.9.1	2023-10-31	Added new algorithm for reordering
+//							MxN Block [P1,P2] output decom
 // 
 //*******************************************************************************
 #include "CalculateReOrder.h"
@@ -35,6 +37,8 @@ int StripesP1(int x, int y, int Xsize, int Ysize, int P1);
 int CalcShiftRow(int x, int y, int Xsize, int Ysize, int P1);
 int CalcShiftCol(int x, int y, int Xsize, int Ysize, int P1);
 int NewAlg5(int x, int y, int Xsize, int Ysize);
+int BlockMxNdecom(int x, int y, int Xsize, int Ysize, int P1, int P2);
+int BlockMxNrecom(int x, int y, int Xsize, int Ysize, int P1, int P2);
 
 //******************************************************************************
 //
@@ -53,7 +57,7 @@ int NewAlg5(int x, int y, int Xsize, int Ysize);
 //						1	resize image
 //
 //*******************************************************************************
-int CalculateReOrder(int x, int y, int Xsize, int Ysize, int Algorithm, int P1, int P2, int* ResizeFlag)
+int CalculateReOrder(int x, int y, int Xsize, int Ysize, int Algorithm, int P1, int P2, int P3, int* ResizeFlag)
 {
 	int Address;
 
@@ -117,8 +121,14 @@ int CalculateReOrder(int x, int y, int Xsize, int Ysize, int Algorithm, int P1, 
 		Address = CalcShiftCol(x, y, Xsize, Ysize, P1);
 		break;
 
-	case 10: // not yet implemented
-		// from Quadrant UL, UR, LL, LR,  center out, no resize
+	case 10: // MxN Block output format decomutation
+		// Horizontal block size = M = P1
+		// Vertical block size = N = P2
+		(*ResizeFlag) = 1;
+		Address = BlockMxNdecom(x, y, Xsize, Ysize, P1, P2);
+		break;
+
+	case 11: // not yet implemented
 		(*ResizeFlag) = -1;
 		Address = NewAlg5(x, y, Xsize, Ysize);
 		break;
@@ -374,6 +384,36 @@ int CalcShiftCol(int x, int y, int Xsize, int Ysize, int P1) {
 
 	Address = x + (y * Xsize);
 	return Address;	return Address;
+}
+
+//******************************************************************************
+//
+// BlockMxNdecom
+// 
+//******************************************************************************
+int BlockMxNdecom(int x, int y, int Xsize, int Ysize, int P1, int P2) {
+	int Address;
+	// M = P1
+	// N = P2
+	int BlockNum;
+	int BlockSize;
+	int Xblock;
+	int Yblock;
+	int BlockPos;
+	int NewAddress;
+
+	// Note:  Code is deliberately not minimized
+	// It is meant to explain the transform math
+	BlockSize = P1 * P2;	// number of pixels in block
+	Xblock = x/P1;			// This pixel (x,y) is in this horizontal block
+	Yblock = y/P2;			// This pixel (x,y) is in this vertical block
+	BlockNum = Xblock + Yblock * (Xsize / P1);  // This pixel (x,y) is in this the linear block number
+	BlockPos = x%P1 + (y%P2) * P1;  // This pixel (x,y) is in this linear position within a block
+	NewAddress = BlockNum * BlockSize + BlockPos; // The calculated address of were this pixel(x,y)
+									// is in the xsize by ysize image
+	Address = NewAddress;
+
+	return Address;
 }
 
 //******************************************************************************

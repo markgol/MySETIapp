@@ -86,7 +86,7 @@ int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, 
 int MathConstant2Image(WCHAR *InputFile, WCHAR *OutputFile, int Value, int Operation, int Warn, int* ArithmeticFlag);
 
 int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int PixelSize,
-	int Algorithm, int P1, int P2);
+	int Algorithm, int P1, int P2, int P3, int Invert);
 
 int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipBits,
 					int xsizesymbol, int ysizesymbol, int Approach, int Highlight);
@@ -102,3 +102,7 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 	int Xloc, int Yloc, int InsertAddFlag);
 
 int Image2Stream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitDepth, int Frames, int Header, int BitOrder, int Invert);
+
+int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePixel, int Lineaer, int EnableBatch, int GenerateBMP);
+
+int StringBlankorComnent(WCHAR* Line, int LineSize);

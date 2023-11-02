@@ -39,6 +39,7 @@
 //                      BitStream2Image(), BatchBitStream2Image()
 // V1.2.8.1 2023-10-5   Added SPP extraction from a TM SPP stream file.
 //                      Changed, Bit sequences report to include 0 sequences.
+// V1.2.9.1 2023-10-31  Added, removal of NULL bytes from bitstream file
 //
 #include "framework.h"
 #include <windowsx.h>
@@ -638,6 +639,7 @@ void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int CurrentY = 0;
     int NumberOfOnes = 0;
     int TotalBits = 0;
+    int Histo[256];
     errno_t ErrNum;
 
     ErrNum = _wfopen_s(&In, InputFile, L"rb");
@@ -659,9 +661,12 @@ void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     fprintf(Out, "Header size per block:%d\nBlock size:%d\n\n",
         NumBlockHeaderBits, NumBlockBodyBits);
     fprintf(Out, "Bit stats:\n");
+    for (int i = 0; i < 256; i++) {
+        Histo[i] = 0;
+    }
 
     while (!feof(In)) {
-        char CurrentByte;
+        unsigned char CurrentByte;
         int BitValue;
         size_t NumRead;
         CurrentByteBit = 0;
@@ -670,6 +675,8 @@ void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
         if (NumRead != 1) {
             break;
         }
+        Histo[CurrentByte]++; // add to histogram
+
         // process input file bit by bit
         // while extracting use selected bit order in byte, LSB to MSB or MSB to LSB
         // variable Endian is really referring to bit order in byte not byte order in multiple byte sequence
@@ -775,6 +782,10 @@ void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     }
     
     fprintf(Out, "Total number of bits set: %d\n", TotalBits);
+    fprintf(Out, "Histogram of bytes in the stream file:\nValue,Count\n");
+    for(int i = 0; i < 256; i++) {
+        fprintf(Out, "%5d, %d\n", i, Histo[i]);
+    }
 
     fclose(In);
     fclose(Out);
@@ -1273,6 +1284,7 @@ int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     }
     fclose(In);
     fclose(OutRaw);
+    
     if (DisplayResults) {
         DisplayImage(OutputFile);
     }
@@ -1691,4 +1703,82 @@ uint16_t ByteSwap(uint16_t Value) {
 
     NewValue = HighByte | (LowByte << 8);
     return NewValue;
+}
+
+//*******************************************************************
+//
+//  RemoveNULLbytes
+//
+//*******************************************************************
+void RemoveNULLbytes(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int NULLvalue,
+                     int NullLength, int SkipBytes)
+{
+    FILE* In;
+    FILE* Out;
+    errno_t ErrNum;
+    int Current;
+    unsigned char Pixel;
+    unsigned char Zero = 0;
+    size_t iRead;
+    int Found = 0;
+
+    ErrNum = _wfopen_s(&In, InputFile, L"rb");
+    if (In == NULL) {
+        MessageBox(hDlg, L"Could not open input file", L"File I/O", MB_OK);
+        return;
+    }
+
+    ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+    if (Out == NULL) {
+        fclose(In);
+        MessageBox(hDlg, L"Could not output file", L"File I/O", MB_OK);
+        return;
+    }
+
+    if (fseek(In, SkipBytes, SEEK_SET) != 0) {
+        fclose(In);
+        MessageBox(hDlg, L"bad format, file, too small", L"File I/O", MB_OK);
+        return;
+    }
+
+    Current = 0;
+    while (!feof(In))
+    {
+        iRead = fread(&Pixel, 1, 1, In);
+        if (iRead == 0) break; // eof
+        if (iRead != 1) {
+            MessageBox(hDlg, L"Read error, input file", L"Raw Input File", MB_OK);
+            fclose(In);
+            fclose(Out);
+            return;
+        }
+        if (Pixel == NULLvalue) {
+            Found++;
+            if (Found >= NullLength) {
+                Found = 0;
+                if (NullLength > 1) {
+                    Current++;
+                    fwrite(&Zero, 1, 1, Out);
+                }
+            }
+            continue;
+        }
+        if (Found != 0) {
+            for (int i = 0; i < Found; i++) {
+                fwrite(&Zero, 1, 1, Out);
+            }
+            Current = Current + Found;
+            Found = 0;
+        }
+        Current++;
+        fwrite(&Pixel, 1, 1, Out);
+    }
+    fclose(In);
+    fclose(Out);
+
+    if (Current == 0) {
+        MessageBox(hDlg, L"Input file was NULL", L"Empty File", MB_OK);
+    }
+
+    return;
 }

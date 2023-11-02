@@ -39,10 +39,13 @@
 //                      (save as 2D image file, right padded with null symbols)
 // V1.2.7.1 2023-10-01  Added skeleton for 5 more algorithms to reordering
 //                      Added insert/add image into an existing image
-// V1.2.8.1 2023-10-xx  Added input2 image file information in dialog for Append end image operation
+// V1.2.8.1 2023-10-16  Added input2 image file information in dialog for Append end image operation
 //                      Changed, Append image end no longer requires Ysize to be the same 
 //                      unless the frames are being added to the end of the first input image.
 //                      Changed, AddSubractConstant to MathConstant, now does +, *, or /
+// V1.2.9.1 2023-10-31  Added,  batch file list for reordering dialog
+//                      Changed, Added block output [P1xP2] transform to reorder by algorithm
+//                      Changed, Added Invert algorithm to reorder by algorithm dialog
 // 
 // Imaging tools dialog box handlers
 // 
@@ -2716,10 +2719,10 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         GetPrivateProfileString(L"ReorderAlgDlg", L"ImageOutput", L"ReorderedAlg.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
 
-        GetPrivateProfileString(L"ReorderAlgDlg", L"Xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ReorderAlgDlg", L"Xsize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_XSIZE, szString);
 
-        GetPrivateProfileString(L"ReorderAlgDlg", L"Ysize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        GetPrivateProfileString(L"ReorderAlgDlg", L"Ysize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_YSIZE, szString);
 
         GetPrivateProfileString(L"ReorderAlgDlg", L"PixelSize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
@@ -2730,6 +2733,9 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 
         GetPrivateProfileString(L"ReorderAlgDlg", L"P2", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_P2, szString);
+
+        GetPrivateProfileString(L"ReorderAlgDlg", L"P3", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_P3, szString);
 
         Algorithm = GetPrivateProfileInt(L"ReorderAlgDlg", L"Algorithm", 0, (LPCTSTR)strAppNameINI);
         // combo box with alogrithm list
@@ -2745,9 +2751,18 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Image in stripes, P1 # stripes");
         SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Circular shift rows by P1");
         SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Circular shift columns by P1");
-        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Not yet implemented");
+        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"MxN block decom, M = P1, N = P2");
         SendMessage(ComboHwnd, CB_SETCURSEL, Algorithm, 0);
         SendMessage(ComboHwnd, CB_SETTOPINDEX, Algorithm, 0);
+
+        int Invert = GetPrivateProfileInt(L"ReorderAlgDlg", L"Invert", 0, (LPCTSTR)strAppNameINI);
+        if (!Invert) {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_CHECKED);
+        }
+
         return (INT_PTR)TRUE;
     }
 
@@ -2818,6 +2833,8 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             int Algorithm;
             int P1;
             int P2;
+            int P3;
+            int Invert = 0;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
@@ -2826,6 +2843,10 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             PixelSize = GetDlgItemInt(hDlg, IDC_PIXEL_SIZE, &bSuccess, TRUE);
             P1 = GetDlgItemInt(hDlg, IDC_P1, &bSuccess, TRUE);
             P2 = GetDlgItemInt(hDlg, IDC_P2, &bSuccess, TRUE);
+            P3 = GetDlgItemInt(hDlg, IDC_P3, &bSuccess, TRUE);
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT)) {
+                Invert = 1;
+            }
 
             if (PixelSize != 0 && PixelSize != 1 && PixelSize != 2 && PixelSize != 4) {
                 MessageBox(hDlg, L"Pixel size must be 1, 2, or 4", L"Bad entry", MB_OK);
@@ -2839,7 +2860,7 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             Algorithm = (int) SendMessage(ComboHwnd, CB_GETCURSEL, 0, 0);
 
             int iRes;
-            iRes = ReorderAlg(InputFile, OutputFile, Xsize, Ysize, PixelSize, Algorithm,P1,P2);
+            iRes = ReorderAlg(InputFile, OutputFile, Xsize, Ysize, PixelSize, Algorithm, P1, P2, P3, Invert);
             if (iRes != 1) {
                 MessageMySETIappError(hDlg, iRes, L"Algorithmic reorder image error\nCheck parameters");
             }
@@ -2868,6 +2889,16 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 
             GetDlgItemText(hDlg, IDC_P2, szString, MAX_PATH);
             WritePrivateProfileString(L"ReorderAlgDlg", L"P2", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_P3, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderAlgDlg", L"P3", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT)) {
+                WritePrivateProfileString(L"ReorderAlgDlg", L"Invert", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ReorderAlgDlg", L"Invert", L"0", (LPCTSTR)strAppNameINI);
+            }
 
             HWND ComboHwnd;
             int Algorithm;
@@ -4200,6 +4231,166 @@ INT_PTR CALLBACK Image2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             }
             else {
                 WritePrivateProfileString(L"Image2StreamDlg", L"Invert", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
+// Message handler for ReorderImageBatchDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK ReorderImageBatchDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+
+    case WM_INITDIALOG:
+    {
+        int ScalePixel;
+        int EnableBatch;
+        int GenerateBMP;
+
+        GetPrivateProfileString(L"ReorderImageBatchDlg", L"BatchInput", L"Batch.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_BATCH_INPUT, szString);
+
+        GetPrivateProfileString(L"ReorderImageBatchDlg", L"TextInput", L"Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+
+        ScalePixel = GetPrivateProfileInt(L"ReorderImageBatchDlg", L"ScalePixel", 0, (LPCTSTR)strAppNameINI);
+        if (!ScalePixel) {
+            CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_CHECKED);
+        }
+
+        EnableBatch = GetPrivateProfileInt(L"ReorderImageBatchDlg", L"EnableBatch", 0, (LPCTSTR)strAppNameINI);
+        if (!EnableBatch) {
+            CheckDlgButton(hDlg, IDC_BATCH, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_BATCH, BST_CHECKED);
+        }
+
+        GenerateBMP = GetPrivateProfileInt(L"ReorderImageBatchDlg", L"GenerateBMP", 0, (LPCTSTR)strAppNameINI);
+        HWND GenarateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+        EnableWindow(GenarateHandle, TRUE);
+        if (!GenerateBMP) {
+            CheckDlgButton(hDlg, IDC_GENERATE_BMP, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_GENERATE_BMP, BST_CHECKED);
+        }
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_BATCH_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+
+            GetDlgItemText(hDlg, IDC_BATCH_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.txt")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_BATCH_INPUT, szString);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_TEXT_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, textType, L"*.txt")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_REORDER:
+        {
+            WCHAR InputFile[MAX_PATH];
+            WCHAR TextInput[MAX_PATH];
+            int ScalePixel = 0;
+            int GenerateBMP = 0;
+            int EnableBatch = 0;
+
+            GetDlgItemText(hDlg, IDC_BATCH_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextInput, MAX_PATH);
+            if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
+                ScalePixel = 1;
+            }
+            if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
+                EnableBatch = 1;
+            }
+            if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
+                GenerateBMP = 1;
+            }
+
+            PixelReorderBatch(hDlg, TextInput, InputFile, ScalePixel, FALSE, EnableBatch, GenerateBMP);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_BATCH_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderImageBatchDlg", L"BatchInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderImageBatchDlg", L"TextInput", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
+                WritePrivateProfileString(L"ReorderImageBatchDlg", L"ScalePixel", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ReorderImageBatchDlg", L"ScalePixel", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
+                WritePrivateProfileString(L"ReorderImageBatchDlg", L"EnableBatch", L"1", (LPCTSTR)strAppNameINI);
+                if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
+                    WritePrivateProfileString(L"ReorderImageBatchDlg", L"GenerateBMP", L"1", (LPCTSTR)strAppNameINI);
+                }
+                else {
+                    WritePrivateProfileString(L"ReorderImageBatchDlg", L"GenerateBMP", L"0", (LPCTSTR)strAppNameINI);
+                }
+            }
+            else {
+                WritePrivateProfileString(L"ReorderImageBatchDlg", L"EnableBatch", L"0", (LPCTSTR)strAppNameINI);
             }
 
             EndDialog(hDlg, LOWORD(wParam));

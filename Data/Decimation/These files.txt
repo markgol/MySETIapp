@@ -1,0 +1,6 @@
+header Decimate kernel 8x8.txt
+header Decimate kernel 16x4.txt
+header Decimate kernel 64x1.txt
+no decimation.txt
+
+These files are decimation kernels for performaing a image decimation based on the content if the file.  The kernels specify which pixels to keep and which to delete in from the input file.

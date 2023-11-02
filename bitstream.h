@@ -35,3 +35,6 @@ int ExtractSPP(HWND hDlg, WCHAR* APIDoutputFile, WCHAR* InputFile, WCHAR* Output
 int DecodeSPP(SPP_PRIMARY_HEADER* PackedPriHeader, SPP_UNPACKED_PRIMARY_HEADER* PriHeader, int Strict);
 
 uint16_t ByteSwap(uint16_t Value);
+
+void RemoveNULLbytes(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int NULLvalue,
+                    int NullLength, int SkipBytes);

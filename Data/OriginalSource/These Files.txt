@@ -1,0 +1,6 @@
+data17.bin
+This is a match to the binary file provided by the A Sign in Space team to ESA that was broadcast by Mars TGO satellite to earth as a simluated 'alien' message.  The A Sign in Space team has confirmed this is the complete message.
+
+
+encap_001.bin
+This is the Space Packet Protocol (ECSS-E-70-41A 30 Jan 2003) telemetry stream that was received.  It encapsulates the entire message.  The data17.bin file was extracted from this file.

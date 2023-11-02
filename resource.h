@@ -50,6 +50,8 @@
 #define IDD_IMGTOOLS_INSERT_IMAGE       164
 #define IDD_BITTOOLS_SPP_EXTRACT        165
 #define IDD_IMGTOOLS_IMAGE2STREAM       166
+#define IDD_BITTOOLS_REMOVENULLS        167
+#define IDD_IMGTOOLS_REORDER_BATCH      168
 #define IDC_APID                        1060
 #define IDC_HEADER2SIZE                 1061
 #define IDC_TEXT_OUTPUT2                1062
@@ -64,11 +66,16 @@
 #define IDC_HEADER                      1072
 #define IDC_FRAMES                      1073
 #define IDC_REORDER                     1074
+#define IDC_NULLVALUE                   1075
+#define IDC_BINARY_OUTPUT_BROWSE        1076
 #define IDC_IMAGE_INPUT_BROWSE          1077
+#define IDC_NULL_LENGTH                 1277
 #define IDC_IMAGE_INPUT                 1078
 #define IDC_IMAGE_OUTPUT                1079
 #define IDC_IMAGE_OUTPUT_BROWSE         1080
 #define IDC_IMAGE_INPUT2                1081
+#define IDC_BATCH_INPUT                 1081
+#define IDC_BATCH_INPUT_BROWSE          1082
 #define IDC_IMAGE_CONV_SCALE_BIN        1083
 #define IDC_FILESIZE                    1090
 #define IDC_OUTPUT_XSIZE                1094
@@ -97,6 +104,7 @@
 #define IDC_YSIZE_SYMBOL                1120
 #define IDC_P2                          1121
 #define IDC_TEXT_OUTPUT                 1122
+#define IDC_P3                          1222
 #define IDC_ADD                         1123
 #define IDC_ADD2                        1124
 #define IDC_SUBTRACT                    1125
@@ -217,6 +225,8 @@
 #define IDM_MATH_CONSTANT               32890
 #define IDM_IMAGETOOLS_EXPORTTEXT       32893
 #define IDM_IMAGETOOLS_EXPORTBITSTREAM  32896
+#define IDM_BITTOOLS_REMOVENULLS        32898
+#define IDM_IMGTOOLS_REORDER_BATCH      32900
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -225,8 +235,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        138
-#define _APS_NEXT_COMMAND_VALUE         32897
-#define _APS_NEXT_CONTROL_VALUE         1075
+#define _APS_NEXT_COMMAND_VALUE         32901
+#define _APS_NEXT_CONTROL_VALUE         1083
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif
