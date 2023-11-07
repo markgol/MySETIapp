@@ -128,12 +128,22 @@
 //                          for IDC_STATIC as -1 (ID #is 16 bits) 
 // V1.2.9.1 2023-10-31  Added, remove NULL bytes from bitstream file
 //                      Changed, added histogram of byte values in bitstream file stats report
-//                      Changed, Reordering by algorithm, add MxN Block [P1,P2] output decom
+//                      Changed, Reordering by algorithm, added MxN Block [P1,P2] output decom
 //						Changed, Reordering by algorithm, Added 3rd parameter (P3) (for future use)
-//                      Changed, Reordering by algorithm, Add Invert algorithm option.
+//                      Changed, Reordering by algorithm, Added Invert algorithm option.
 //                      Correction, bug in extract image operation cortrected when extracted image
-//						    was larger in the vertical direction than the source image.
-//						Added,  batch input file list for reordering operation. Batch file has both input filename and output filename
+//					            was larger in the vertical direction than the source image.
+//						Added,  batch input file list for reordering operation. Batch file has 
+//                              both input filename and output filename
+// V1.2.10.1 2023-11-2  Added, new 'Add kernel to image' dialog on a kernel based grid
+//                      Changed, Text to bitstream file, added output byte Bit Order flag
+//                      Changed, Bistream to image file, Added input file byte Bit Order flag
+//                      Changed, Bistream to image file, Changed dialog to clarify which
+//                        bit order flag applies to input file and which applies ot output file.
+//                      Changed, Reordering by algorithm, added split image left/right
+//                      Changed, global Setting, added auto save PNG flag when creating a BMP file  
+//                      Changed, ExportBMP, added automatically saving a matching .png using a global flag
+//                      Changed, all Reordering dialogs.  Added inverse transform option               
 // 
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -174,6 +184,7 @@ int DisplayResults = 0;
 int AutoScaleResults = 0;
 int DefaultRBG = 0;
 int AutoSize = 0;
+int AutoPNG = 0;
 
 // The following is from the version information in the resource file
 CString strProductName;
@@ -238,6 +249,7 @@ INT_PTR CALLBACK    ExtractSPPDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Image2StreamDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    RemoveNULLsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ReorderImageBatchDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    AddKernelDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -380,10 +392,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    GetPrivateProfileString(L"GlobalSettings", L"CurrentFIlename", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
    wcscpy_s(szCurrentFilename, szString);
 
-   DisplayResults = GetPrivateProfileInt(L"GlobalSettings", L"DisplayResults", 0, (LPCTSTR)strAppNameINI);
-   AutoScaleResults = GetPrivateProfileInt(L"GlobalSettings", L"AutoScaleResults", 0, (LPCTSTR)strAppNameINI);
-   DefaultRBG = GetPrivateProfileInt(L"GlobalSettings", L"DefaultRBG", 0, (LPCTSTR)strAppNameINI);
+   DisplayResults = GetPrivateProfileInt(L"GlobalSettings", L"DisplayResults", 1, (LPCTSTR)strAppNameINI);
+   AutoScaleResults = GetPrivateProfileInt(L"GlobalSettings", L"AutoScaleResults", 1, (LPCTSTR)strAppNameINI);
+   DefaultRBG = GetPrivateProfileInt(L"GlobalSettings", L"DefaultRBG", 1, (LPCTSTR)strAppNameINI);
    AutoSize = GetPrivateProfileInt(L"GlobalSettings", L"AutoSize", 0, (LPCTSTR)strAppNameINI);
+   AutoPNG = GetPrivateProfileInt(L"GlobalSettings", L"AutoPNG", 1, (LPCTSTR)strAppNameINI);
 
    return TRUE;
 }
@@ -611,6 +624,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case IDM_IMGTOOLS_CONVOLUTION:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_CONVOLUTION), hWnd, ConvolutionImageDlg);
+                break;
+                
+            case IDM_IMGTOOLS_ADD_KERNEL:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_ADD_KERNEL), hWnd, AddKernelDlg);
                 break;
 
             case IDM_IMGTOOLS_ADDIMAGES:

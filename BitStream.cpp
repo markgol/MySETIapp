@@ -40,6 +40,11 @@
 // V1.2.8.1 2023-10-5   Added SPP extraction from a TM SPP stream file.
 //                      Changed, Bit sequences report to include 0 sequences.
 // V1.2.9.1 2023-10-31  Added, removal of NULL bytes from bitstream file
+// V1.2.10.1 2023-11-4  Changed, Text to bitstream file, added BitOrder flag
+//                      Changed, Bistream to image file, Added input file BitOrder flag
+//                      Changed, Bistream to image file, Changed dialog to clarify which
+//                        bit order flag applies to input file and which applies ot output file.
+//                      Changed, Extract Btistream to text file dialogs, added flag for input file bit order swap
 //
 #include "framework.h"
 #include <windowsx.h>
@@ -75,6 +80,8 @@
 //  int NumBlockBodyBits    # of bits in block body (>=1)
 //  int NumBlocks           # of blocks (>=1)
 //  int xsize               # of bits to report on a line of text (>=1)
+//  int BitOrder            0 - standard byte bit order for input file
+//                          1 - swap byte bit order for input file
 // 
 // The text file output is:
 //      Prologue line
@@ -87,7 +94,7 @@
 //*******************************************************************
 void ExtractFromBitStreamText(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int NumBlockHeaderBits, int NumBlockBodyBits, int NumBlocks,
-    int xsize, int Invert)
+    int xsize, int Invert, int BitOrder)
 {
     // This function is large because of formatting the output
     //  text file into header, {block header, block}, footer
@@ -136,7 +143,12 @@ void ExtractFromBitStreamText(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
             // process data bit by bit in the order of the bit transmission message
             // input file is byte oriented MSB to LSB representing the bit order that the message was received
             // This does not imply any bit ordering in the message itself.
-            BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            if (BitOrder == 0) {
+                BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            }
+            else {
+                BitValue = CurrentByte & (0x01 << CurrentByteBit);
+            }
             if (Invert == 1) {
                 if (BitValue == 0) {
                     BitValue = 1;
@@ -286,7 +298,8 @@ void ExtractFromBitStreamText(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 // int SkipSize         # of bits to skip before starting (typically the prologue)
 //
 //*******************************************************************
-void BitDistance(HWND hDlg, WCHAR* InputFile,WCHAR* OutputFile, int SkipSize)
+void BitDistance(HWND hDlg, WCHAR* InputFile,WCHAR* OutputFile, int SkipSize,
+    int BitOrder)
 {
     FILE* In;
     FILE* Out;
@@ -353,7 +366,12 @@ void BitDistance(HWND hDlg, WCHAR* InputFile,WCHAR* OutputFile, int SkipSize)
             else if (CurrentBit == SkipSize) {
                 LastOne = CurrentBit - 1;
             }
-            BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            if (BitOrder == 0) {
+                BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            }
+            else {
+                BitValue = CurrentByte & (0x01 << CurrentByteBit);
+            }
             if (BitValue) {
                 NumOnes++;
                 Distance = CurrentBit - LastOne;
@@ -385,7 +403,8 @@ void BitDistance(HWND hDlg, WCHAR* InputFile,WCHAR* OutputFile, int SkipSize)
 // int SkipSize         # of bits to skip before starting (typically the prologue)
 //
 //*******************************************************************
-void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize)
+void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize,
+    int BitOrder)
 {
     FILE* In;
     FILE* Out;
@@ -442,8 +461,12 @@ void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize)
             }
 
             // current bit
-            BitValue = CurrentByte & (0x80 >> CurrentByteBit);
-
+            if (BitOrder == 0) {
+                BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            }
+            else {
+                BitValue = CurrentByte & (0x01 << CurrentByteBit);
+            }
             // process this bit
             // possible states:
             //      first bit
@@ -624,7 +647,8 @@ void FileHexDump(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int xsize, int 
 // 
 //******************************************************************************
 void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
-    int PrologueSize, int NumBlockHeaderBits, int NumBlockBodyBits, int BlockNum)
+    int PrologueSize, int NumBlockHeaderBits, int NumBlockBodyBits,
+    int BlockNum, int BitOrder)
 {
     FILE* In;
     FILE* Out;
@@ -684,8 +708,12 @@ void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
             // process data bit by bit in the order of the bit transmission message
             // input file is byte oriented MSB to LSB representing the bit order that the message was received
             // This does not imply any bit ordering in the message itself.
-            BitValue = CurrentByte & (0x80 >> CurrentByteBit);
-
+            if (BitOrder == 0) {
+                BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            }
+            else {
+                BitValue = CurrentByte & (0x01 << CurrentByteBit);
+            }
             // allow for message prolouge/header at the beginning of the message 
             if (PrologueSize > 0) {
                 if (CurrentPrologueBit < PrologueSize) {
@@ -811,7 +839,7 @@ void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 // 
 //******************************************************************************
 void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
-    int SkipSize, int CopyBits, int xsize)
+    int SkipSize, int CopyBits, int xsize, int Invert, int BitOrder)
 {
     FILE* In;
     FILE* Out;
@@ -862,8 +890,21 @@ void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
             // process data bit by bit in the order of the bit transmission message
             // input file is byte oriented MSB to LSB representing the bit order that the message was received
             // This does not imply any bit ordering in the message itself.
-            BitValue = CurrentByte & (0x80 >> CurrentByteBit);
-
+            if (BitOrder == 0) {
+                BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            }
+            else {
+                BitValue = CurrentByte & (0x01 << CurrentByteBit);
+            }
+            if (Invert) {
+                if (BitValue == 0) {
+                    BitValue = 1;
+                }
+                else {
+                    BitValue = 0;
+                }
+            }
+            
             // Skip bits at the beginning of the message 
             if (CurrentBit< SkipSize) {
                     CurrentByteBit++;
@@ -958,7 +999,7 @@ void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 //******************************************************************************
 void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize, int xsizeEnd, 
-    int BitDepth, int BitOrder, int BitScale, int Invert)
+    int BitDepth, int BitOrder, int BitScale, int Invert, int InputBitOrder)
 {
     int SaveDisplayResults;
 
@@ -1011,7 +1052,7 @@ void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
         
         err= BitStream2Image(hDlg, InputFile, NewFilename,
             PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, CurrentXsize,
-            BitDepth, BitOrder, BitScale, Invert);
+            BitDepth, BitOrder, BitScale, Invert, InputBitOrder);
         if (err != 1) {
             TCHAR pszMessageBuf[MAX_PATH];
             StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH,
@@ -1055,7 +1096,7 @@ void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 //******************************************************************************
 int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
-    int BitDepth, int BitOrder, int BitScale, int Invert)
+    int BitDepth, int BitOrder, int BitScale, int Invert, int InputBitOrder)
 {
     FILE* In;
     FILE* OutRaw;
@@ -1155,7 +1196,12 @@ int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
         // This does not imply any bit ordering in the message itself.
         while (CurrentByteBit < 8) {
             // MSB to LSB in input data file 
-            BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            if (InputBitOrder) {
+                BitValue = CurrentByte & (0x01 << CurrentByteBit);
+            }
+            else {
+                BitValue = CurrentByte & (0x80 >> CurrentByteBit);
+            }
             if (Invert==1) {
                 if (BitValue == 0) {
                     BitValue = 1;
@@ -1307,7 +1353,7 @@ int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 //  WCHAR* OutputFile       Packed Binary bit stream file
 //
 //*******************************************************************
-int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
+int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitOrder)
 {
     FILE* In;
     FILE* Out;
@@ -1352,7 +1398,12 @@ int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
             return -3;
         }
         if (BitValue > 0) {
-            ByteValue = ByteValue | (0x01 << BitNumber);
+            if (BitOrder) {
+                ByteValue = ByteValue | (0x01 << BitNumber);
+            }
+            else {
+                ByteValue = ByteValue | (0x80 >> BitNumber);
+            }
             TotalOneBits++;
         }
         TotalBits++;

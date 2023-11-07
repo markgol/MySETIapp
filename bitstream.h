@@ -4,29 +4,32 @@
 
 void ExtractFromBitStreamText(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int NumBlockHeaderBits, int NumBlockBodyBits, int NumBlocks,
-    int xsize, int Invert);
+    int xsize, int Invert, int BitOrder);
 
-void BitDistance(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize);
+void BitDistance(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int SkipSize,
+    int BitOrder);
 
-void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int PrologueSize);
+void BitSequences(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int PrologueSize,
+    int BitOrder);
 
 void FileHexDump(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int xsize, int SkipBytes);
 
 void BitStreamStats(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
-    int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum);
+    int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits,
+    int BlockNum, int BitOrder);
 
 void ExtractBits(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
-    int SkipSize, int CopyBits, int xsize);
+    int SkipSize, int CopyBits, int xsize, int Invert, int BitOrder);
 
 int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
-    int BitDepth, int BitOrder, int BitScale, int Invert);
+    int BitDepth, int BitOrder, int BitScale, int Invert, int InputBitOrder);
 
 void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize,
-    int xsizeEnd, int BitDepth, int BitOrder, int BitScale, int Invert);
+    int xsizeEnd, int BitDepth, int BitOrder, int BitScale, int Invert, int InputBitOrder);
 
-int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile);
+int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitOrder);
 
 int ExtractSPP(HWND hDlg, WCHAR* APIDoutputFile, WCHAR* InputFile, WCHAR* OutputFile,
                 int APID, int SkipBytes, int SecondaryHeaderSize,

@@ -31,6 +31,15 @@
 // V1.2.8.1 2023-10-16  Added Space protocol Packet extraction from a TM SPP stream file.
 //                      Added filesize to most bit dialogs
 // V1.2.9.1 2023-10-31  Added, removal of NULL bytes from bitstream file dialog
+// V1.2.10.1 2023-11-4  Changed, Text to bitstream file,
+//                          added Bit Order flag
+//                          added Invert bits flag to extract subset operation
+//                      Changed, Bit stream file operations that didn't already have a inut byte Bit Order flag
+//                        now does with the excpetion of the HEX Dump, SPP and remove NULLs
+//                      Changed, Bistream to image file, Added input file BitOrder flag
+//                      Changed, Bistream to image file, Changed dialog to clarify which
+//                        bit order flag applies to input file and which applies ot output file.
+//                      Changed, Bit Reorder dialog, added invert reorder transform
 // 
 // Bit tools dialog box handlers
 // 
@@ -356,6 +365,7 @@ INT_PTR CALLBACK BitTextStreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
 
     case WM_INITDIALOG:
         int Invert;
+        int BitOrder;
 
         GetPrivateProfileString(L"BitTextStreamDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
@@ -396,6 +406,14 @@ INT_PTR CALLBACK BitTextStreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             CheckDlgButton(hDlg, IDC_INVERT, BST_CHECKED);
         }
 
+        BitOrder = GetPrivateProfileInt(L"BitTextStreamDlg", L"BitOrder", 0, (LPCTSTR)strAppNameINI);
+        if (!BitOrder) {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_CHECKED);
+        }
+        
         return (INT_PTR)TRUE;
 
     case WM_COMMAND:
@@ -463,6 +481,7 @@ INT_PTR CALLBACK BitTextStreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             int NumBlockBodyBits;
             int BlockHeaderBits;
             int Invert = 0;
+            int BitOrder = 0;
 
             GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, OutputFile, MAX_PATH);
@@ -480,9 +499,14 @@ INT_PTR CALLBACK BitTextStreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
                 Invert = 1;
             }
+            
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                BitOrder = 1;
+            }
 
             ExtractFromBitStreamText(hDlg, InputFile, OutputFile,
-                PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize, Invert);
+                PrologueSize, BlockHeaderBits, NumBlockBodyBits,
+                BlockNum, xsize, Invert, BitOrder);
 
             return (INT_PTR)TRUE;
         }
@@ -516,6 +540,13 @@ INT_PTR CALLBACK BitTextStreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
                 WritePrivateProfileString(L"BitTextStreamDlg", L"Invert", L"0", (LPCTSTR)strAppNameINI);
             }
 
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                WritePrivateProfileString(L"BitTextStreamDlg", L"BitOrder", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BitTextStreamDlg", L"BitOrder", L"0", (LPCTSTR)strAppNameINI);
+            }
+
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
 
@@ -540,6 +571,10 @@ INT_PTR CALLBACK BitExtractDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
+    {
+        int Invert;
+        int BitOrder;
+
         GetPrivateProfileString(L"BitExtractDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
@@ -565,8 +600,24 @@ INT_PTR CALLBACK BitExtractDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         GetPrivateProfileString(L"BitExtractDlg", L"xsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_XSIZE, szString);
 
-        return (INT_PTR)TRUE;
+        Invert = GetPrivateProfileInt(L"BitExtractDlg", L"Invert", 0, (LPCTSTR)strAppNameINI);
+        if (!Invert) {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_CHECKED);
+        }
 
+        BitOrder = GetPrivateProfileInt(L"BitExtractDlg", L"BitOrder", 0, (LPCTSTR)strAppNameINI);
+        if (!BitOrder) {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_CHECKED);
+        }
+
+        return (INT_PTR)TRUE;
+    }
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
         case IDC_INPUT_BROWSE:
@@ -629,6 +680,8 @@ INT_PTR CALLBACK BitExtractDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             int xsize;
             int CopyBits;
             int SkipBits;
+            int Invert = 0;
+            int BitOrder = 0;
 
             GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, OutputFile, MAX_PATH);
@@ -637,7 +690,15 @@ INT_PTR CALLBACK BitExtractDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             SkipBits = GetDlgItemInt(hDlg, IDC_SKIP_BITS, &bSuccess, TRUE);
             xsize = GetDlgItemInt(hDlg, IDC_XSIZE, &bSuccess, TRUE);
 
-            ExtractBits(hDlg, InputFile, OutputFile, SkipBits, CopyBits, xsize);
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                Invert = 1;
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                BitOrder = 1;
+            }
+
+            ExtractBits(hDlg, InputFile, OutputFile, SkipBits, CopyBits, xsize, Invert, BitOrder);
 
             return (INT_PTR)TRUE;
         }
@@ -657,6 +718,20 @@ INT_PTR CALLBACK BitExtractDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 
             GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
             WritePrivateProfileString(L"BitExtractDlg", L"xsize", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                WritePrivateProfileString(L"BitExtractDlg", L"Invert", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BitExtractDlg", L"Invert", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                WritePrivateProfileString(L"BitExtractDlg", L"BitOrder", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BitExtractDlg", L"BitOrder", L"0", (LPCTSTR)strAppNameINI);
+            }
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
@@ -682,6 +757,9 @@ INT_PTR CALLBACK BitDistancesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
+    {
+        int BitOrder;
+
         GetPrivateProfileString(L"BitDistancesDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
@@ -701,7 +779,16 @@ INT_PTR CALLBACK BitDistancesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         GetPrivateProfileString(L"BitDistancesDlg", L"PrologueSize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_PROLOGUE_SIZE, szString);
 
+        BitOrder = GetPrivateProfileInt(L"BitDistancesDlg", L"BitOrder", 0, (LPCTSTR)strAppNameINI);
+        if (!BitOrder) {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_CHECKED);
+        }
+
         return (INT_PTR)TRUE;
+    }
 
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
@@ -762,11 +849,16 @@ INT_PTR CALLBACK BitDistancesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             WCHAR InputFile[MAX_PATH];
             WCHAR OutputFile[MAX_PATH];
             int PrologueSize;
+            int BitOrder = 0;
 
             GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, OutputFile, MAX_PATH);
             PrologueSize = GetDlgItemInt(hDlg, IDC_PROLOGUE_SIZE, &bSuccess, TRUE);
-            BitDistance(hDlg, InputFile, OutputFile, PrologueSize);
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                BitOrder = 1;
+            }
+
+            BitDistance(hDlg, InputFile, OutputFile, PrologueSize, BitOrder);
 
             return (INT_PTR)TRUE;
         }
@@ -780,6 +872,13 @@ INT_PTR CALLBACK BitDistancesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 
             GetDlgItemText(hDlg, IDC_PROLOGUE_SIZE, szString, MAX_PATH);
             WritePrivateProfileString(L"BitDistancesDlg", L"PrologueSize", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                WritePrivateProfileString(L"BitDistancesDlg", L"BitOrder", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BitDistancesDlg", L"BitOrder", L"0", (LPCTSTR)strAppNameINI);
+            }
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
@@ -805,6 +904,9 @@ INT_PTR CALLBACK BitSequencesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
+    {
+        int BitOrder;
+
         GetPrivateProfileString(L"BitSequencesDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
@@ -824,7 +926,16 @@ INT_PTR CALLBACK BitSequencesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         GetPrivateProfileString(L"BitSequencesDlg", L"PrologueSize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_PROLOGUE_SIZE, szString);
 
+        BitOrder = GetPrivateProfileInt(L"BitSequencesDlg", L"BitOrder", 0, (LPCTSTR)strAppNameINI);
+        if (!BitOrder) {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_CHECKED);
+        }
+
         return (INT_PTR)TRUE;
+    }
 
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
@@ -885,11 +996,17 @@ INT_PTR CALLBACK BitSequencesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             WCHAR InputFile[MAX_PATH];
             WCHAR OutputFile[MAX_PATH];
             int PrologueSize;
+            int BitOrder = 0;
 
             GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, OutputFile, MAX_PATH);
             PrologueSize = GetDlgItemInt(hDlg, IDC_PROLOGUE_SIZE, &bSuccess, TRUE);
-            BitSequences(hDlg, InputFile, OutputFile, PrologueSize);
+            
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                BitOrder = 1;
+            }
+
+            BitSequences(hDlg, InputFile, OutputFile, PrologueSize, BitOrder);
 
             return (INT_PTR)TRUE;
         }
@@ -903,6 +1020,13 @@ INT_PTR CALLBACK BitSequencesDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 
             GetDlgItemText(hDlg, IDC_PROLOGUE_SIZE, szString, MAX_PATH);
             WritePrivateProfileString(L"BitSequencesDlg", L"PrologueSize", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                WritePrivateProfileString(L"BitSequencesDlg", L"BitOrder", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BitSequencesDlg", L"BitOrder", L"0", (LPCTSTR)strAppNameINI);
+            }
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
@@ -928,6 +1052,9 @@ INT_PTR CALLBACK BitStatsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
+    {
+        int BitOrder;
+
         GetPrivateProfileString(L"BitStatsDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
 
@@ -956,8 +1083,16 @@ INT_PTR CALLBACK BitStatsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
         GetPrivateProfileString(L"BitStatsDlg", L"BlockNum", L"1", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BLOCK_NUM, szString);
 
-        return (INT_PTR)TRUE;
+        BitOrder = GetPrivateProfileInt(L"BitStatsDlg", L"BitOrder", 0, (LPCTSTR)strAppNameINI);
+        if (!BitOrder) {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_CHECKED);
+        }
 
+        return (INT_PTR)TRUE;
+    }
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
         case IDC_INPUT_BROWSE:
@@ -1020,6 +1155,7 @@ INT_PTR CALLBACK BitStatsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             int BlockNum;
             int NumBlockBodyBits;
             int BlockHeaderBits;
+            int BitOrder = 0;
 
             GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, OutputFile, MAX_PATH);
@@ -1031,9 +1167,14 @@ INT_PTR CALLBACK BitStatsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             NumBlockBodyBits = GetDlgItemInt(hDlg, IDC_BLOCK_BITS, &bSuccess, TRUE);
 
             BlockNum = GetDlgItemInt(hDlg, IDC_BLOCK_NUM, &bSuccess, TRUE);
+            
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                BitOrder = 1;
+            }
 
             BitStreamStats(hDlg, InputFile, OutputFile,
-                PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum);
+                PrologueSize, BlockHeaderBits, NumBlockBodyBits,
+                BlockNum, BitOrder);
 
             return (INT_PTR)TRUE;
         }
@@ -1056,6 +1197,13 @@ INT_PTR CALLBACK BitStatsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
             GetDlgItemText(hDlg, IDC_BLOCK_NUM, szString, MAX_PATH);
             WritePrivateProfileString(L"BitStatsDlg", L"BlockNum", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                WritePrivateProfileString(L"BitStatsDlg", L"BitOrder", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BitStatsDlg", L"BitOrder", L"0", (LPCTSTR)strAppNameINI);
+            }
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;
@@ -1085,6 +1233,7 @@ INT_PTR CALLBACK BitReorderDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
     {
         int ScalePixel;
         IMAGINGHEADER ImageHeader;
+        int Invert = 0;
 
         GetPrivateProfileString(L"BitReorderDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
@@ -1113,6 +1262,15 @@ INT_PTR CALLBACK BitReorderDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         else {
             CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_CHECKED);
         }
+
+        Invert = GetPrivateProfileInt(L"BitReorderDlg", L"Invert", 0, (LPCTSTR)strAppNameINI);
+        if (!Invert) {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_CHECKED);
+        }
+
         return (INT_PTR)TRUE;
     }
 
@@ -1204,6 +1362,7 @@ INT_PTR CALLBACK BitReorderDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             WCHAR TextInput[MAX_PATH];
             WCHAR OutputFile[MAX_PATH];
             int ScalePixel = 0;
+            int Invert = 0;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextInput, MAX_PATH);
@@ -1211,8 +1370,12 @@ INT_PTR CALLBACK BitReorderDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
                 ScalePixel = 1;
             }
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                Invert = 1;
+            }
 
-            PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, TRUE, FALSE, FALSE);
+
+            PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, TRUE, FALSE, FALSE, Invert);
 
             return (INT_PTR)TRUE;
         }
@@ -1232,6 +1395,13 @@ INT_PTR CALLBACK BitReorderDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             }
             else {
                 WritePrivateProfileString(L"BitReorderDlg", L"ScalePixel", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                WritePrivateProfileString(L"BitReorderDlg", L"Invert", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BitReorderDlg", L"Invert", L"0", (LPCTSTR)strAppNameINI);
             }
 
             EndDialog(hDlg, LOWORD(wParam));
@@ -1262,6 +1432,7 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
         int BitOrder;
         int BitScale;
         int Invert;
+        int InputBitOrder;
 
         GetPrivateProfileString(L"BitImageDlg", L"BinaryInput", L"OriginalSource\\data17.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_INPUT, szString);
@@ -1306,6 +1477,14 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             CheckDlgButton(hDlg, IDC_BITORDER, BST_UNCHECKED);
         } else {
             CheckDlgButton(hDlg, IDC_BITORDER, BST_CHECKED);
+        }
+
+        InputBitOrder = GetPrivateProfileInt(L"BitImageDlg", L"InputBitOrder", 0, (LPCTSTR)strAppNameINI);
+        if (!InputBitOrder) {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INPUT_BITORDER, BST_CHECKED);
         }
 
         BitScale = GetPrivateProfileInt(L"BitImageDlg", L"BitScale", 0, (LPCTSTR)strAppNameINI);
@@ -1396,6 +1575,7 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             int BitOrder = 0;
             int BitScale = 0;
             int Invert = 0;
+            int InputBitOrder;
 
             GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
@@ -1417,6 +1597,10 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
                 BitOrder = 1;
             }
 
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                InputBitOrder = 1;
+            }
+
             if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
                 BitScale = 1;
             }
@@ -1428,14 +1612,14 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             if (xsize >= xsizeEnd) {
                 BitStream2Image(hDlg, InputFile, OutputFile,
                     PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize,
-                    BitDepth, BitOrder, BitScale, Invert);
+                    BitDepth, BitOrder, BitScale, Invert, InputBitOrder);
 
                 wcscpy_s(szCurrentFilename, OutputFile);
             }
             else {
                 BatchBitStream2Image(hDlg, InputFile, OutputFile,
                     PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize, xsizeEnd,
-                    BitDepth, BitOrder, BitScale, Invert);
+                    BitDepth, BitOrder, BitScale, Invert, InputBitOrder);
             }
             return (INT_PTR)TRUE;
         }
@@ -1473,6 +1657,13 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             }
             else {
                 WritePrivateProfileString(L"BitImageDlg", L"BitOrder", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INPUT_BITORDER) == BST_CHECKED) {
+                WritePrivateProfileString(L"BitImageDlg", L"InputBitOrder", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BitImageDlg", L"InputBitOrder", L"0", (LPCTSTR)strAppNameINI);
             }
 
             if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
@@ -1515,13 +1706,25 @@ INT_PTR CALLBACK Text2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
         WCHAR szString[MAX_PATH];
 
     case WM_INITDIALOG:
+    {
+        int BitOrder;
+
         GetPrivateProfileString(L"Text2StreamDlg", L"TextInput", L"data17.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
 
         GetPrivateProfileString(L"Text2StreamDlg", L"BinaryOutput", L"bitstream.bin", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString);
 
+        BitOrder = GetPrivateProfileInt(L"Text2StreamDlg", L"BitOrder", 0, (LPCTSTR)strAppNameINI);
+        if (!BitOrder) {
+            CheckDlgButton(hDlg, IDC_BITORDER, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_BITORDER, BST_CHECKED);
+        }
+
         return (INT_PTR)TRUE;
+    }
 
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
@@ -1570,11 +1773,16 @@ INT_PTR CALLBACK Text2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
         {
             WCHAR InputFile[MAX_PATH];
             WCHAR OutputFile[MAX_PATH];
+            int BitOrder = 0;
 
             GetDlgItemText(hDlg, IDC_TEXT_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, OutputFile, MAX_PATH);
 
-            ConvertText2BitStream(hDlg, InputFile, OutputFile);
+            if (IsDlgButtonChecked(hDlg, IDC_BITORDER) == BST_CHECKED) {
+                BitOrder = 1;
+            }
+
+            ConvertText2BitStream(hDlg, InputFile, OutputFile,BitOrder);
 
             return (INT_PTR)TRUE;
         }
@@ -1585,6 +1793,13 @@ INT_PTR CALLBACK Text2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 
             GetDlgItemText(hDlg, IDC_BINARY_OUTPUT, szString, MAX_PATH);
             WritePrivateProfileString(L"Text2StreamDlg", L"BinaryOutput", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_BITORDER) == BST_CHECKED) {
+                WritePrivateProfileString(L"Text2StreamDlg", L"BitOrder", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"Text2StreamDlg", L"BitOrder", L"0", (LPCTSTR)strAppNameINI);
+            }
 
             EndDialog(hDlg, LOWORD(wParam));
             return (INT_PTR)TRUE;

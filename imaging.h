@@ -39,7 +39,7 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR* ImageOutputFile);
 
 int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile, int ScalePixel, int LinearOnly,
-				int EnableBatch, int GenerateBMP);
+				int EnableBatch, int GenerateBMP, int Invert);
 
 int ReadReoderingFile(WCHAR* TextInput, int** DecomX, int** DecomY, int* DecomXsize, int* DecomYsize, int LinearOnly,
 				int EnableBatch);
@@ -64,6 +64,8 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile);
 int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile);
 
 int AddSubtractImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* OutputFile, int ADDflag);
+
+int AddSubtractKernel(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* OutputFile, int ADDflag);
 
 int RotateImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction);
 
@@ -103,6 +105,9 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 
 int Image2Stream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitDepth, int Frames, int Header, int BitOrder, int Invert);
 
-int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePixel, int Lineaer, int EnableBatch, int GenerateBMP);
+int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePixel, int Lineaer, int EnableBatch,
+						int GenerateBMP, int Invert);
 
 int StringBlankorComnent(WCHAR* Line, int LineSize);
+
+int ReadIntKernelFile(HWND hDlg, WCHAR* TextInput, int** Kernelptr, int* KernelXsize, int* KernelYsize);

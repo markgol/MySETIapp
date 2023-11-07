@@ -17,6 +17,7 @@ extern int DisplayResults;
 extern int AutoScaleResults;
 extern int DefaultRBG;
 extern int AutoSize;
+extern int AutoPNG;
 extern HWND hwndMain;
 extern HWND hwndImage;
 extern HINSTANCE hInst;

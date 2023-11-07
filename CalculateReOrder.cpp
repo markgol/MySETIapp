@@ -23,6 +23,8 @@
 //							Shift (rotate) Columns
 // V1.2.9.1	2023-10-31	Added new algorithm for reordering
 //							MxN Block [P1,P2] output decom
+// V1.2.10.1 2023-11-5  Added new algorithm for reordering
+//							Added split image left/right                      
 // 
 //*******************************************************************************
 #include "CalculateReOrder.h"
@@ -39,6 +41,7 @@ int CalcShiftCol(int x, int y, int Xsize, int Ysize, int P1);
 int NewAlg5(int x, int y, int Xsize, int Ysize);
 int BlockMxNdecom(int x, int y, int Xsize, int Ysize, int P1, int P2);
 int BlockMxNrecom(int x, int y, int Xsize, int Ysize, int P1, int P2);
+int SplitLeftRight(int x, int y, int Xsize, int Ysize, int P1);
 
 //******************************************************************************
 //
@@ -128,7 +131,17 @@ int CalculateReOrder(int x, int y, int Xsize, int Ysize, int Algorithm, int P1, 
 		Address = BlockMxNdecom(x, y, Xsize, Ysize, P1, P2);
 		break;
 
-	case 11: // not yet implemented
+	case 11: // Split image left/right
+		if (P1 < 1 || P1 > (Xsize / 2)) {
+			(*ResizeFlag) = -1;
+			return 0;
+		}
+
+		(*ResizeFlag) = 1;
+		Address = SplitLeftRight(x, y, Xsize, Ysize, P1);
+		break;
+
+	case 12: // not yet implemented
 		(*ResizeFlag) = -1;
 		Address = NewAlg5(x, y, Xsize, Ysize);
 		break;
@@ -412,6 +425,38 @@ int BlockMxNdecom(int x, int y, int Xsize, int Ysize, int P1, int P2) {
 	NewAddress = BlockNum * BlockSize + BlockPos; // The calculated address of were this pixel(x,y)
 									// is in the xsize by ysize image
 	Address = NewAddress;
+
+	return Address;
+}
+
+//******************************************************************************
+//
+// SplitLeftRight
+// 
+//******************************************************************************
+int SplitLeftRight(int x, int y, int Xsize, int Ysize, int P1)
+{
+	// P1 = # of pixel in group to split
+
+	int Address;
+	int Middle;
+	int GroupNum;
+	int GroupMiddle;
+	int Xpos;
+
+	Middle = Xsize / 2;
+	GroupNum = x / P1;
+
+	GroupMiddle = Xsize / (2 * P1);
+
+	if (GroupNum < GroupMiddle) {
+		Xpos = (GroupNum * P1 * 2) + x % P1;
+	}
+	else {
+		Xpos = ((GroupNum-GroupMiddle) * P1 * 2) + (x % P1) + P1;
+	}
+
+	Address = Xpos + (y * Xsize);
 
 	return Address;
 }

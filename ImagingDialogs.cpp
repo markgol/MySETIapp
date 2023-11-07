@@ -46,6 +46,7 @@
 // V1.2.9.1 2023-10-31  Added,  batch file list for reordering dialog
 //                      Changed, Added block output [P1xP2] transform to reorder by algorithm
 //                      Changed, Added Invert algorithm to reorder by algorithm dialog
+// V1.2.10.1 2023-11-5  Changed, Reordering by algorithm, added split image left/right                      
 // 
 // Imaging tools dialog box handlers
 // 
@@ -769,6 +770,7 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
     {
         int ScalePixel;
         int EnableBatch;
+        int Invert;
         int GenerateBMP;
         IMAGINGHEADER ImageHeader;
 
@@ -797,6 +799,14 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
         }
         else {
             CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_CHECKED);
+        }
+
+        Invert = GetPrivateProfileInt(L"ReorderImageDlg", L"Invert", 0, (LPCTSTR)strAppNameINI);
+        if (!Invert) {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_CHECKED);
         }
 
         EnableBatch = GetPrivateProfileInt(L"ReorderImageDlg", L"EnableBatch", 0, (LPCTSTR)strAppNameINI);
@@ -917,6 +927,7 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             int ScalePixel = 0;
             int GenerateBMP = 0;
             int EnableBatch = 0;
+            int Invert = 0;
 
             GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextInput, MAX_PATH);
@@ -924,6 +935,11 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
                 ScalePixel = 1;
             }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                Invert = 1;
+            }
+
             if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
                 EnableBatch = 1;
                 if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
@@ -931,7 +947,8 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
                 }
             }
 
-            PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, FALSE, EnableBatch, GenerateBMP);
+            PixelReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, FALSE, EnableBatch,
+                            GenerateBMP, Invert);
             wcscpy_s(szCurrentFilename, OutputFile);
             return (INT_PTR)TRUE;
         }
@@ -948,8 +965,16 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             
             if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
                 WritePrivateProfileString(L"ReorderImageDlg", L"ScalePixel", L"1", (LPCTSTR)strAppNameINI);
-            } else {
+            }
+            else {
                 WritePrivateProfileString(L"ReorderImageDlg", L"ScalePixel", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                WritePrivateProfileString(L"ReorderImageDlg", L"Invert", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ReorderImageDlg", L"Invert", L"0", (LPCTSTR)strAppNameINI);
             }
 
             if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
@@ -2752,6 +2777,7 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Circular shift rows by P1");
         SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Circular shift columns by P1");
         SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"MxN block decom, M = P1, N = P2");
+        SendMessage(ComboHwnd, CB_ADDSTRING, 0, (LPARAM)L"Split image left/right, # pixels in split group");
         SendMessage(ComboHwnd, CB_SETCURSEL, Algorithm, 0);
         SendMessage(ComboHwnd, CB_SETTOPINDEX, Algorithm, 0);
 
@@ -4262,6 +4288,7 @@ INT_PTR CALLBACK ReorderImageBatchDlg(HWND hDlg, UINT message, WPARAM wParam, LP
         int ScalePixel;
         int EnableBatch;
         int GenerateBMP;
+        int Invert;
 
         GetPrivateProfileString(L"ReorderImageBatchDlg", L"BatchInput", L"Batch.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_BATCH_INPUT, szString);
@@ -4275,6 +4302,14 @@ INT_PTR CALLBACK ReorderImageBatchDlg(HWND hDlg, UINT message, WPARAM wParam, LP
         }
         else {
             CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_CHECKED);
+        }
+
+        Invert = GetPrivateProfileInt(L"ReorderImageBatchDlg", L"Invert", 0, (LPCTSTR)strAppNameINI);
+        if (!Invert) {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_CHECKED);
         }
 
         EnableBatch = GetPrivateProfileInt(L"ReorderImageBatchDlg", L"EnableBatch", 0, (LPCTSTR)strAppNameINI);
@@ -4349,6 +4384,7 @@ INT_PTR CALLBACK ReorderImageBatchDlg(HWND hDlg, UINT message, WPARAM wParam, LP
             int ScalePixel = 0;
             int GenerateBMP = 0;
             int EnableBatch = 0;
+            int Invert = 0;
 
             GetDlgItemText(hDlg, IDC_BATCH_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextInput, MAX_PATH);
@@ -4358,11 +4394,15 @@ INT_PTR CALLBACK ReorderImageBatchDlg(HWND hDlg, UINT message, WPARAM wParam, LP
             if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
                 EnableBatch = 1;
             }
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                Invert = 1;
+            }
             if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
                 GenerateBMP = 1;
             }
 
-            PixelReorderBatch(hDlg, TextInput, InputFile, ScalePixel, FALSE, EnableBatch, GenerateBMP);
+            PixelReorderBatch(hDlg, TextInput, InputFile, ScalePixel, FALSE, EnableBatch,
+                                GenerateBMP, Invert);
             return (INT_PTR)TRUE;
         }
 
@@ -4378,6 +4418,13 @@ INT_PTR CALLBACK ReorderImageBatchDlg(HWND hDlg, UINT message, WPARAM wParam, LP
             }
             else {
                 WritePrivateProfileString(L"ReorderImageBatchDlg", L"ScalePixel", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                WritePrivateProfileString(L"ReorderImageBatchDlg", L"Invert", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ReorderImageBatchDlg", L"Invert", L"0", (LPCTSTR)strAppNameINI);
             }
 
             if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
@@ -4401,6 +4448,178 @@ INT_PTR CALLBACK ReorderImageBatchDlg(HWND hDlg, UINT message, WPARAM wParam, LP
             return (INT_PTR)TRUE;
         }
     }
+    return (INT_PTR)FALSE;
+}
+
+
+//*******************************************************************************
+//
+// Message handler for AddKernelDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK AddKernelDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        IMAGINGHEADER ImageHeader;
+
+        GetPrivateProfileString(L"AddKernelDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"AddKernelDlg", L"Kernel", L"kernel.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+        
+        GetPrivateProfileString(L"AddKernelDlg", L"ImageOutput", L"TestKernel.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_TEXT_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.txt")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"Image files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_ADD:
+        {
+            WCHAR InputFile[MAX_PATH];
+            WCHAR TextFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+
+            AddSubtractKernel(hDlg, InputFile, TextFile, OutputFile, TRUE);
+            wcscpy_s(szCurrentFilename, OutputFile);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_SUBTRACT:
+        {
+            WCHAR InputFile[MAX_PATH];
+            WCHAR TextFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+
+            AddSubtractKernel(hDlg, InputFile, TextFile, OutputFile, FALSE);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"AddKernelDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"AddKernelDlg", L"Kernel", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"AddKernelDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+
     return (INT_PTR)FALSE;
 }
 

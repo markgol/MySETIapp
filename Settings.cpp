@@ -27,6 +27,7 @@
 //                      The .ini location is always the same folder as the executable.
 // V1.2.6.1 2023-09-24  Added temp image filename to app settings.  For use in debugging
 //                      functions by saving intermediate results.
+// V1.2.10.1 2023-11-2  Changed, global Setting, added auto save PNG flag when creating a BMP file
 //
 // Global Settings dialog box handler
 // 
@@ -82,6 +83,11 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
         iRes = GetPrivateProfileInt(L"GlobalSettings", L"DefaultRBG", 1, (LPCTSTR)strAppNameINI);
         if (iRes != 0) {
             CheckDlgButton(hDlg, IDC_SETTINGS_RGB_DISPLAY, BST_CHECKED);
+        }
+        
+        iRes = GetPrivateProfileInt(L"GlobalSettings", L"AutoPNG", 1, (LPCTSTR)strAppNameINI);
+        if (iRes != 0) {
+            CheckDlgButton(hDlg, IDC_SETTINGS_AUTO_PNG, BST_CHECKED);
         }
 
         return (INT_PTR)TRUE;
@@ -168,6 +174,16 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             else {
                 WritePrivateProfileString(L"GlobalSettings", L"DefaultRBG", L"0", (LPCTSTR)strAppNameINI);
                 DefaultRBG = 0;
+            }
+
+            // IDC_SETTINGS_AUTO_PNG
+            if (IsDlgButtonChecked(hDlg, IDC_SETTINGS_AUTO_PNG) == BST_CHECKED) {
+                WritePrivateProfileString(L"GlobalSettings", L"AutoPNG", L"1", (LPCTSTR)strAppNameINI);
+                AutoPNG = 1;
+            }
+            else {
+                WritePrivateProfileString(L"GlobalSettings", L"AutoPNG", L"0", (LPCTSTR)strAppNameINI);
+                AutoPNG = 0;
             }
 
             EndDialog(hDlg, LOWORD(wParam));

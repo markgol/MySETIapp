@@ -58,6 +58,8 @@
 //                      The BMP file is still only a 8bpp file.
 //                      (not applicable to A Sign in Space project)
 // V1.2.8.1 2023-10-18  Add filesize function
+// V1.2.10.1 2023-11-5  Changed, Export file, output file default is same as input file with .bmp extension
+//                      Changed, ExportBMP, added automatically saving a matching .png using a global flag  
 //
 #include "framework.h"
 #include "resource.h"
@@ -65,6 +67,7 @@
 #include <winver.h>
 #include <vector>
 #include <atlstr.h>
+#include <gdiplus.h>
 #include "globals.h"
 #include <strsafe.h>
 #include "FileFunctions.h"
@@ -857,36 +860,61 @@ void ExportFile(HWND hWnd, int wmId)
         }
     }
     WritePrivateProfileString(L"ExportFile", L"InputFile", InputFile, (LPCTSTR)strAppNameINI);
+    
+    {
+        //parse for just filename
+        int err;
+        WCHAR Drive[_MAX_DRIVE];
+        WCHAR Dir[_MAX_DIR];
+        WCHAR Fname[_MAX_FNAME];
+        WCHAR Ext[_MAX_EXT];
 
-    if (wmId == IDM_FILE_TOBMP) {
-
-        GetPrivateProfileString(L"ExportFile", L"BMPFile", L"Message.bmp", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-        COMDLG_FILTERSPEC BMPType[] =
-        {
-             { L"BMP files", L"*.bmp" },
-             { L"All Files", L"*.*" },
-        };
-        if (!CCFileSave(hWnd, szString, &pszFilename, FALSE, 2, BMPType, L".bmp")) {
+        // split apart original filename
+        err = _wsplitpath_s(InputFile, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+            _MAX_FNAME, Ext, _MAX_EXT);
+        if (err != 0) {
             return;
         }
-        WritePrivateProfileString(L"ExportFile", L"BMPFile", pszFilename, (LPCTSTR)strAppNameINI);
 
-    }
-    else if (wmId == IDM_FILE_TOTXT) {
-        GetPrivateProfileString(L"ExportFile", L"TextFile", L"Message.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        if (wmId == IDM_FILE_TOBMP) {
 
-        COMDLG_FILTERSPEC TXTType[] =
-        {
-             { L"Image files", L"*.txt" },
-             { L"All Files", L"*.*" },
-        };
-        if (!CCFileSave(hWnd, (LPWSTR)L"", &pszFilename, FALSE, 2, TXTType, L".txt")) {
-            return;
+            // GetPrivateProfileString(L"ExportFile", L"BMPFile", L"Message.bmp", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+            // change the input file to be .bmp extension
+            err = _wmakepath_s(szString, _MAX_PATH, Drive, Dir, Fname, L".bmp");
+            if (err != 0) {
+                return;
+            }
+            
+            COMDLG_FILTERSPEC BMPType[] =
+            {
+                 { L"BMP files", L"*.bmp" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hWnd, szString, &pszFilename, FALSE, 2, BMPType, L".bmp")) {
+                return;
+            }
+            WritePrivateProfileString(L"ExportFile", L"BMPFile", pszFilename, (LPCTSTR)strAppNameINI);
+
         }
-        WritePrivateProfileString(L"ExportFile", L"TextFile", pszFilename, (LPCTSTR)strAppNameINI);
+        else if (wmId == IDM_FILE_TOTXT) {
+            
+            err = _wmakepath_s(szString, _MAX_PATH, Drive, Dir, Fname, L".txt");
+            if (err != 0) {
+                return;
+            }
 
+            COMDLG_FILTERSPEC TXTType[] =
+            {
+                 { L"Image files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hWnd, szString, &pszFilename, FALSE, 2, TXTType, L".txt")) {
+                return;
+            }
+            WritePrivateProfileString(L"ExportFile", L"TextFile", pszFilename, (LPCTSTR)strAppNameINI);
+
+        }
     }
-
     wcscpy_s(szString, pszFilename);
     CoTaskMemFree(pszFilename);
 
@@ -1352,6 +1380,12 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
 
     free(BMPimage);
     fclose(Out);
+
+    if (AutoPNG) {
+        if (SaveBMP2PNG(Filename) != 1) {
+            return 0;
+        }
+    }
 
     return 1;
 }
@@ -2026,4 +2060,104 @@ int GetFileSize(WCHAR* szString)
 
     fclose(In);
     return FileSize;
+}
+
+//****************************************************************
+//
+//  GetEncoderClsid
+// 
+// This is based on a solution provided at:
+// https://learn.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-retrieving-the-class-identifier-for-an-encoder-use
+// 
+//****************************************************************
+// using namespace Gdiplus;
+INT GetEncoderClsid(const WCHAR* format, CLSID* pClsid);  // helper function
+
+INT GetEncoderClsid(const WCHAR* format, CLSID* pClsid) {
+    UINT  num = 0;          // number of image encoders
+    UINT  size = 0;         // size of the image encoder array in bytes
+
+    Gdiplus::ImageCodecInfo* pImageCodecInfo = NULL;
+
+    Gdiplus::GetImageEncodersSize(&num, &size);
+    if (size == 0)
+        return -1;  // Failure
+
+    pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
+    if (pImageCodecInfo == NULL)
+        return -1;  // Failure
+
+    GetImageEncoders(num, size, pImageCodecInfo);
+
+    for (UINT j = 0; j < num; ++j)
+    {
+        if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
+        {
+            *pClsid = pImageCodecInfo[j].Clsid;
+            free(pImageCodecInfo);
+            return j;  // Success
+        }
+    }
+
+    free(pImageCodecInfo);
+    return -1;  // Failure
+}
+
+//****************************************************************
+//
+//  SaveBMP2PNG
+// 
+// This is based on a solution provided at:
+// https://learn.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-converting-a-bmp-image-to-a-png-image-use
+// 
+//****************************************************************
+// using namespace Gdiplus;
+
+int SaveBMP2PNG(WCHAR* Filename)
+{
+    // Initialize GDI+.
+    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+
+    CLSID   encoderClsid;
+    Gdiplus::Status  stat;
+
+    // load BMP file to image
+    Gdiplus::Image* image = new Gdiplus::Image(Filename);
+
+    // Get the CLSID of the PNG encoder.
+    GetEncoderClsid(L"image/png", &encoderClsid);
+    // generate .png name version of Filename
+    {
+        //parse for just filename
+        int err;
+        WCHAR Drive[_MAX_DRIVE];
+        WCHAR Dir[_MAX_DIR];
+        WCHAR Fname[_MAX_FNAME];
+        WCHAR Ext[_MAX_EXT];
+        WCHAR PNGfilename[MAX_PATH];
+
+        // split apart original filename
+        err = _wsplitpath_s(Filename, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+            _MAX_FNAME, Ext, _MAX_EXT);
+        if (err != 0) {
+            return 0;
+        }
+
+        err = _wmakepath_s(PNGfilename, _MAX_PATH, Drive, Dir, Fname, L".png");
+        if (err != 0) {
+            return 0;
+        }
+
+        stat = image->Save(PNGfilename, &encoderClsid, NULL);
+    }
+    delete image;
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+
+    if (stat == Gdiplus::Ok) {
+        return 1;
+    }
+
+    return 0;
 }

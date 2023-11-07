@@ -17,6 +17,7 @@ int ImportBMP(HWND hWnd);
 int HEX2Binary(HWND hWnd);
 int CamIRaImport(HWND hWnd);
 int GetFileSize(WCHAR* szString);
+int SaveBMP2PNG(WCHAR* Filename);
 
 BOOL GetProductAndVersion(CString* strProductName,
     CString* strProductVersion,
