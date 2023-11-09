@@ -46,7 +46,8 @@
 // V1.2.9.1 2023-10-31  Added,  batch file list for reordering dialog
 //                      Changed, Added block output [P1xP2] transform to reorder by algorithm
 //                      Changed, Added Invert algorithm to reorder by algorithm dialog
-// V1.2.10.1 2023-11-5  Changed, Reordering by algorithm, added split image left/right                      
+// V1.2.10.1 2023-11-5  Changed, Reordering by algorithm, added split image left/right
+// V1.2.11.1 2023-11-7  Added, new dialog, Reorder blocks[MxM] in image using kernel
 // 
 // Imaging tools dialog box handlers
 // 
@@ -988,6 +989,281 @@ INT_PTR CALLBACK ReorderImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             }
             else {
                 WritePrivateProfileString(L"ReorderImageDlg", L"EnableBatch", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}
+
+//*******************************************************************************
+//
+// Message handler for ReorderBlockImageDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK ReorderBlocksImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+
+    case WM_INITDIALOG:
+    {
+        int ScalePixel;
+        int EnableBatch;
+        int Invert;
+        int GenerateBMP;
+        IMAGINGHEADER ImageHeader;
+
+        GetPrivateProfileString(L"ReorderBlocksImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"ReorderBlocksImageDlg", L"TextInput", L"Reorder\\reorder.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+
+        GetPrivateProfileString(L"ReorderBlocksImageDlg", L"ImageOutput", L"Reordered.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        GetPrivateProfileString(L"ReorderBlocksImageDlg", L"Xsize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XSIZE, szString);
+
+        GetPrivateProfileString(L"ReorderBlocksImageDlg", L"Ysize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YSIZE, szString);
+
+        GetPrivateProfileString(L"ReorderBlocksImageDlg", L"PixelSize", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString);
+
+        ScalePixel = GetPrivateProfileInt(L"ReorderBlocksImageDlg", L"ScalePixel", 0, (LPCTSTR)strAppNameINI);
+        if (!ScalePixel) {
+            CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_CHECKED);
+        }
+
+        Invert = GetPrivateProfileInt(L"ReorderBlocksImageDlg", L"Invert", 0, (LPCTSTR)strAppNameINI);
+        if (!Invert) {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_INVERT, BST_CHECKED);
+        }
+
+        EnableBatch = GetPrivateProfileInt(L"ReorderBlocksImageDlg", L"EnableBatch", 0, (LPCTSTR)strAppNameINI);
+        if (!EnableBatch) {
+            CheckDlgButton(hDlg, IDC_BATCH, BST_UNCHECKED);
+            HWND GenarateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+            EnableWindow(GenarateHandle, FALSE);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_BATCH, BST_CHECKED);
+            GenerateBMP = GetPrivateProfileInt(L"ReorderBlocksImageDlg", L"GenerateBMP", 0, (LPCTSTR)strAppNameINI);
+            HWND GenarateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+            EnableWindow(GenarateHandle, TRUE);
+            if (!GenerateBMP) {
+                CheckDlgButton(hDlg, IDC_GENERATE_BMP, BST_UNCHECKED);
+            }
+            else {
+                CheckDlgButton(hDlg, IDC_GENERATE_BMP, BST_CHECKED);
+            }
+        }
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_TEXT_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"text files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, textType, L"*.txt")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_TEXT_INPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_IMAGE_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_BATCH:
+            if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
+                HWND GenerateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+                EnableWindow(GenerateHandle, TRUE);
+            }
+            else {
+                HWND GenerateHandle = GetDlgItem(hDlg, IDC_GENERATE_BMP);
+                EnableWindow(GenerateHandle, FALSE);
+            }
+            return (INT_PTR)TRUE;
+
+        case IDC_REORDER:
+        {
+            WCHAR InputFile[MAX_PATH];
+            WCHAR TextInput[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int ScalePixel = 0;
+            int GenerateBMP = 0;
+            int EnableBatch = 0;
+            int Invert = 0;
+            int Xsize;
+            int Ysize;
+            int PixelSize;
+            int bSuccess;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, TextInput, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+
+            Xsize = GetDlgItemInt(hDlg, IDC_XSIZE, &bSuccess, TRUE);
+            Ysize = GetDlgItemInt(hDlg, IDC_YSIZE, &bSuccess, TRUE);
+            PixelSize = GetDlgItemInt(hDlg, IDC_PIXEL_SIZE, &bSuccess, TRUE);
+
+            if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
+                ScalePixel = 1;
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                Invert = 1;
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
+                EnableBatch = 1;
+                if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
+                    GenerateBMP = 1;
+                }
+            }
+
+            BlockReorder(hDlg, TextInput, InputFile, OutputFile, ScalePixel, FALSE, EnableBatch,
+                GenerateBMP, Xsize, Ysize, PixelSize, Invert);
+            wcscpy_s(szCurrentFilename, OutputFile);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderBlocksImageDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_TEXT_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderBlocksImageDlg", L"TextInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderBlocksImageDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderBlocksImageDlg", L"Xsize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderBlocksImageDlg", L"Ysize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_PIXEL_SIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"ReorderBlocksImageDlg", L"PixelSize", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
+                WritePrivateProfileString(L"ReorderBlocksImageDlg", L"ScalePixel", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ReorderBlocksImageDlg", L"ScalePixel", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_INVERT) == BST_CHECKED) {
+                WritePrivateProfileString(L"ReorderBlocksImageDlg", L"Invert", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"ReorderBlocksImageDlg", L"Invert", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_BATCH) == BST_CHECKED) {
+                WritePrivateProfileString(L"ReorderBlocksImageDlg", L"EnableBatch", L"1", (LPCTSTR)strAppNameINI);
+                if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
+                    WritePrivateProfileString(L"ReorderBlocksImageDlg", L"GenerateBMP", L"1", (LPCTSTR)strAppNameINI);
+                }
+                else {
+                    WritePrivateProfileString(L"ReorderBlocksImageDlg", L"GenerateBMP", L"0", (LPCTSTR)strAppNameINI);
+                }
+            }
+            else {
+                WritePrivateProfileString(L"ReorderBlocksImageDlg", L"EnableBatch", L"0", (LPCTSTR)strAppNameINI);
             }
 
             EndDialog(hDlg, LOWORD(wParam));

@@ -53,6 +53,7 @@
 #define IDD_BITTOOLS_REMOVENULLS        167
 #define IDD_IMGTOOLS_REORDER_BATCH      168
 #define IDD_IMGTOOLS_ADD_KERNEL         169
+#define IDD_IMGTOOLS_REORDER_BLOCKS     170
 #define IDC_APID                        1060
 #define IDC_HEADER2SIZE                 1061
 #define IDC_TEXT_OUTPUT2                1062
@@ -131,7 +132,6 @@
 #define IDC_BMP_RESULTS_BROWSE          1147
 #define IDC_SETTINGS_AUTOSCALE_RESULTS  1148
 #define IDC_MIRROR_HORIZ                1149
-#define IDC_SETTINGS_DISPLAY_RESULTS2   1149
 #define IDC_SETTINGS_AUTO_PNG           1149
 #define IDC_MIRROR_VERT                 1150
 #define IDC_IMG_TEMP                    1151
@@ -231,8 +231,9 @@
 #define IDM_IMAGETOOLS_EXPORTBITSTREAM  32896
 #define IDM_BITTOOLS_REMOVENULLS        32898
 #define IDM_IMGTOOLS_REORDER_BATCH      32900
-#define ID_IMAGETOOLS_ADD               32901
 #define IDM_IMGTOOLS_ADD_KERNEL         32902
+#define IDM_IMAGETOOLS_REORDER_BLOCKS   32904
+#define IDM_IMGTOOLS_REORDER_BLOCKS     32905
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -241,7 +242,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        138
-#define _APS_NEXT_COMMAND_VALUE         32903
+#define _APS_NEXT_COMMAND_VALUE         32906
 #define _APS_NEXT_CONTROL_VALUE         1083
 #define _APS_NEXT_SYMED_VALUE           110
 #endif

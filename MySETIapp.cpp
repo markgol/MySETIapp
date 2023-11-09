@@ -143,7 +143,8 @@
 //                      Changed, Reordering by algorithm, added split image left/right
 //                      Changed, global Setting, added auto save PNG flag when creating a BMP file  
 //                      Changed, ExportBMP, added automatically saving a matching .png using a global flag
-//                      Changed, all Reordering dialogs.  Added inverse transform option               
+//                      Changed, all Reordering dialogs.  Added inverse transform option 
+// V1.2.11.1 2023-11-7  Added, new dialog, Reorder blocks[MxM] in image             
 // 
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -250,6 +251,7 @@ INT_PTR CALLBACK    Image2StreamDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    RemoveNULLsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ReorderImageBatchDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    AddKernelDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    ReorderBlocksImageDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -588,6 +590,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case IDM_IMGTOOLS_REORDER_BATCH:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_REORDER_BATCH), hWnd, ReorderImageBatchDlg);
+                break;
+
+            case IDM_IMGTOOLS_REORDER_BLOCKS:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_REORDER_BLOCKS), hWnd, ReorderBlocksImageDlg);
                 break;
 
             case IDM_IMAGETOOLS_REORDER_ALG:

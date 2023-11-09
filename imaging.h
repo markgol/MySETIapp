@@ -111,3 +111,10 @@ int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePi
 int StringBlankorComnent(WCHAR* Line, int LineSize);
 
 int ReadIntKernelFile(HWND hDlg, WCHAR* TextInput, int** Kernelptr, int* KernelXsize, int* KernelYsize);
+
+int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile, int ScalePixel, int LinearOnly,
+	int EnableBatch, int GenerateBMP, int Xsize, int Ysize, int PixelSize, int Invert);
+
+void ComputeBlockReordering(int* DecomAddress, int xsize, int ysize, int* DecomX, int* DecomY,
+	int DecomXsize, int DecomYsize, int BlockXsize, int BlockYsize);
+

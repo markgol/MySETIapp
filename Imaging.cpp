@@ -67,6 +67,8 @@
 //						Changed, 'Redorder by algorithm' now includes Invert algorithm flag
 //						Correction, PixelReorder, fixed correct output for 2 and 4 byte pixels
 //						Changed, PixelReorder,  Added inverse reorder transform
+// V1.2.11.1 2023-11-7	Added, ComputeBlockReordering and BlockReorder
+//
 #include "framework.h"
 #include "stdio.h"
 #include "wchar.h"
@@ -956,11 +958,9 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 //
 // PixelReorder
 //
-// This function appends an image file to the right side of the image.
-// The y size of the two file must be the same.  The number of frames in both
-// files must be the same.  The x size of the input files does not have to be
-// the same. The PixelSize does not need to be the same.  The larger of the
-// input image pixel sizes will be used for the the new file. 
+// This function reorders the pixel in a image.  It does this by first traeting the image
+// as a group of block.  The size of a block matches the pixel reorder kernel size.
+// The pixels withinh a block are reordered according the reordering kernel. 
 // 
 // 1D reordering
 //		This is intended for flat image files (ysize=1).  The total length is divided
@@ -1070,7 +1070,6 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 	int DecomYsize;
 	int Offset;
 	int iRes;
-	int i;
 	int NumKernels;
 	PIXEL Pixel;
 	errno_t ErrNum;
@@ -1465,6 +1464,7 @@ int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int Deco
 	delete[] NewDecomY;
 	return 1;
 }
+
 //******************************************************************************
 //
 // ComputeReordering
@@ -5100,4 +5100,439 @@ int ReadIntKernelFile(HWND hDlg, WCHAR* TextInput, int** Kernelptr, int* KernelX
 	*Kernelptr = Kernel;
 
 	return 1;
+}
+
+//******************************************************************************
+//
+// BlockReorder
+//
+// This function reorders the blocks of pixels in an image. It does this by first
+// treating the image as a group of blocks MxN in size.  The reorder kernel specifies
+// which block positions each block of pixels in the image should go.  The number of
+// of entries in a kernel must match the number of block in the image.
+// For example:  a 256x256 image, a block size of 8x8 would be require a
+// kernel size 32x32
+//
+// Pixels within a block group are not reordered.
+//  
+// 1D reordering
+//		This is intended for flat image files (ysize=1).  The total length is divided
+//		into xsize/'n' blocks.  Where 'n' is the length of the reordering kernel.
+//		This requires the total length to be divisble by 'n'.
+// 
+//		The reordering file for 1D reordering has the following text format:
+//			n,1
+//			'n' values whitespace delimited
+//			after the 'n' values an optional description is recommended.
+//			A reordering value is relative to the its position in the
+//			kernel. A 0 means the pixel is not moved
+//		Example:
+//			16,1
+//			15 13 11 9 7 5 3 1 -1 -3 -5 -7 -9 -11 -13 -15
+//			This reverses the order in the block of 16 pixels
+//			0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 -> 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1
+//			
+// 2D reordering
+//		This is intended for 2D image files.  The is divided into groups that are
+//		'n' by 'm' in size.  Where 'n' is the length of the reordering kernel and
+//		'm' is the height of the reordering kernel.
+//		This requires the total xsize of the image to be divisble by 'n'.
+//		This requires the total ysize of the image to be divisble by 'm'.
+// 
+//		The reordering file for 2D reordering has the following 3 text formats:
+//			n,m
+//			followed by n*m pairs of values with whitespace between the pairs
+//			after the n*m pairs of values an optional description is recommended.
+//			The reordering value is relative to the its position in the
+//			kernel. A 0,0 means the pixel is not moved.  This is the most flexible
+//			speficiation as it allows the replacement pixels to be outside of
+//			the kernel bounds but it can be more difficult for people to visualize.
+//			The other 2 formats gets translated into this form in order to be applied.
+// 
+//			Example:
+//			8,2
+//			7,1  5,1  3,1  1,1  -1,1  -3,1  -5,1  -7,1
+//			7,-1 5,-1 3,-1 1,-1 -1,-1 -3,-1 -5,-1 -7,-1
+// 
+//			n,m,0
+//			followed by n*m values with whitespace between the values
+//			after the n*m values an optional description is recommended.
+//			Reordering values is the linear address of replacment pixel in the 
+//			the kernel, 0 based.
+//			Example:
+//			8,2
+//			 15 14 13 12 11 10 9 8
+//			  7  6  5  4  3  2 1 0
+// 
+//			n,m,1
+//			followed by n*m values with whitespace between the values
+//			after the n*m values an optional description is recommended.
+//			Reordering values is the linear address of replacment pixel in the 
+//			the kernel, 1 based.
+//			Example:
+//			8,2
+//			 16 15 14 13 12 11 10 9
+//			  8  7  6  5  4  3  2 1 
+// 
+//			These example kernals reverses the order of pixels left to right in
+//			the block and swaps row so that a 8x2 block of pixel values:
+//			0 1  2  3  4  5  6  7 
+//			8 9 10 11 12 13 14 15
+//			becomes
+//			15 14 13 12 11 10 9 8
+//			 7  6  5  4  3  2 1 0
+//
+//	Batch processing of reordering kernels
+//	When the Enable Batch flag is set then multiple reodering kernels can be in a
+//	reordering file.  When batch processing the kernels are listed sequentially.
+//	Batch processing ends when a comment, EOF or an error in a kernel is encountered.
+//	An index number starting at 1 is added to the output filename for each kernel processed.
+// 
+// Parameters:
+//	HWND hDlg				Handle of calling window or dialog
+//	WCHAR* TextInput		Reordering file (text file)
+//	WCHAR* InputFile		Input image file
+//	WCHAR* ImageOutputFile	Reordered image file
+//	int ScalePixel			Scale as binary image to make it easy easier to in display
+//							pixel=0 -> 0,  pixel>0 -> 255
+//	int LinearOnly			1 - 1d image file pixel reorder
+//							0 - 2d image file pixel reorder
+//	int EnableBatch			1 - enable batch processing of kernel file
+//							0 - disable batch processing of kernel file
+//	int GenerateBMP			1 - Generate BMP file after each batch processing step
+//							0 - Do not generate BMP during batch procssing
+//							This option is only meanuingful when EnableBatch is 1.
+//  int Xsize				x diemension of block
+//  int Ysze				y dimension of block
+//
+//	int Invert				0 - forward reordering transform
+//							1 - incerse reordering transform
+//  return value:
+//  1 - Success
+//  !=1 Error see standardized app error list at top of this source file
+//						see standarized app error number listed above
+//
+//******************************************************************************
+int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFile,
+	int ScalePixel, int LinearOnly, int EnableBatch, int GenerateBMP, int Xsize, int Ysize,
+	int PixelSize, int Invert)
+{
+	FILE* Out;
+	IMAGINGHEADER ImgHeader;
+	int* InputImage;
+	int* DecomX;
+	int* DecomY;
+	int* DecomAddress;
+	int DecomXsize;
+	int DecomYsize;
+	int Offset;
+	int iRes;
+	int NumKernels;
+	int NumXblocks;
+	int NumYblocks;
+
+	PIXEL Pixel;
+	errno_t ErrNum;
+
+	// read input image file
+	iRes = LoadImageFile(&InputImage, InputFile, &ImgHeader);
+	if (iRes != 1) {
+		MessageBox(hDlg, L"Could not load image file", L"File I/O", MB_OK);
+		return iRes;
+	}
+
+	if (PixelSize != 0) {
+		ImgHeader.PixelSize = PixelSize;
+	}
+
+	if (LinearOnly && ImgHeader.Ysize != 1) {
+		delete[] InputImage;
+		MessageBox(hDlg, L"Input file requires linear image file (Ysize=1)", L"File incompatible", MB_OK);
+		return -4;
+	}
+
+	if (Xsize <= 0 || Ysize <= 0) {
+		delete[] InputImage;
+		MessageBox(hDlg, L"Xsize and Ysize must be >= 1", L"Bad Parameters", MB_OK);
+		return 0;
+	}
+
+	if (ImgHeader.Xsize % Xsize != 0 || ImgHeader.Ysize % Ysize) {
+		delete[] InputImage;
+		MessageBox(hDlg, L"Image x,y size must be divisble\nby the x,y block size", L"Bad Parameters", MB_OK);
+		return 0;
+	}
+
+	NumXblocks = ImgHeader.Xsize / Xsize;
+	NumYblocks = ImgHeader.Ysize / Ysize;
+
+	NumKernels = ReadReoderingFile(TextInput, &DecomX, &DecomY, &DecomXsize, &DecomYsize, LinearOnly, EnableBatch);
+	if (NumKernels <= 0) {
+		delete[] InputImage;
+		MessageBox(hDlg, L"Pixel reodering file read failure", L"File incompatible", MB_OK);
+		return -4;
+	}
+
+	if (DecomXsize != NumXblocks || DecomYsize != NumYblocks) {
+		delete[] InputImage;
+		delete[] DecomX;
+		delete[] DecomY;
+		MessageBox(hDlg, L"x or y kernel size does not equal\nthe number of x or y blocks", L"Bad Parameters", MB_OK);
+		return 0;
+	}
+
+	if (LinearOnly && DecomYsize != 1) {
+		delete[] InputImage;
+		delete[] DecomX;
+		delete[] DecomY;
+		MessageBox(hDlg, L"Reordering kernel Ysize must be 1", L"File incompatible", MB_OK);
+		return 0;
+	}
+
+	int FrameSize = ImgHeader.Xsize * ImgHeader.Ysize;
+	DecomAddress = new int[(size_t)FrameSize];
+	if (DecomAddress == NULL) {
+		delete[] DecomY;
+		delete[] DecomX;
+		delete[] InputImage;
+		MessageBox(hDlg, L"Decom address table allocation failure", L"System Error", MB_OK);
+		return -1;
+	}
+
+	int* OutputImage;
+	OutputImage = new int[(size_t)FrameSize * ImgHeader.NumFrames];
+	if (OutputImage == NULL) {
+		delete[] DecomY;
+		delete[] DecomX;
+		delete[] InputImage;
+		delete[] DecomAddress;
+		MessageBox(hDlg, L"Output Image allocation failure", L"System Error", MB_OK);
+		return -1;
+	}
+
+	int KernelOffset;
+
+	for (int Kernel = 0; Kernel < NumKernels; Kernel++) {
+		WCHAR BMPfilename[MAX_PATH];
+		WCHAR NewFilename[MAX_PATH];
+
+		KernelOffset = Kernel * DecomXsize * DecomYsize;
+
+		// calculate decom address table
+		// A reordering list is made for an entire frame, so that
+		// applying it is just a simple lookup table
+
+		ComputeBlockReordering(DecomAddress, ImgHeader.Xsize, ImgHeader.Ysize,
+								DecomX + KernelOffset, DecomY + KernelOffset,
+								DecomXsize, DecomYsize, Xsize,Ysize);
+
+		// compute new image
+		for (int Frame = 0; Frame < ImgHeader.NumFrames; Frame++) {
+			Offset = Frame * FrameSize;
+			for (int i = 0; i < FrameSize; i++) {
+				if (Invert == 0) {
+					OutputImage[Offset + i] = InputImage[Offset + DecomAddress[i]];
+				}
+				else {
+					OutputImage[Offset + DecomAddress[i]] = InputImage[Offset + i];
+				}
+			}
+		}
+
+		if (EnableBatch) {
+			// for Batch processing, cutup filename, reassemble with index number (Kernel)
+			int err;
+			WCHAR Drive[_MAX_DRIVE];
+			WCHAR Dir[_MAX_DIR];
+			WCHAR Fname[_MAX_FNAME];
+			WCHAR Ext[_MAX_EXT];
+
+			// split apart original filename
+			err = _wsplitpath_s(OutputFile, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+				_MAX_FNAME, Ext, _MAX_EXT);
+			if (err != 0) {
+				delete[] DecomY;
+				delete[] DecomX;
+				delete[] InputImage;
+				delete[] DecomAddress;
+				delete[] OutputImage;
+				MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+				return -2;
+			}
+			// change the fname portion to add _kernel# 1 based
+			// use Kernel+1
+			WCHAR NewFname[_MAX_FNAME];
+
+			swprintf_s(NewFname, _MAX_FNAME, L"%s_%d", Fname, Kernel + 1);
+
+			// reassemble filename
+			err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, NewFname, Ext);
+			if (err != 0) {
+				delete[] DecomY;
+				delete[] DecomX;
+				delete[] InputImage;
+				delete[] DecomAddress;
+				delete[] OutputImage;
+				MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+				return -2;
+			}
+			// create BMP of file
+			if (GenerateBMP) {
+				err = _wmakepath_s(BMPfilename, _MAX_PATH, Drive, Dir, NewFname, L".bmp");
+				if (err != 0) {
+					delete[] DecomY;
+					delete[] DecomX;
+					delete[] InputImage;
+					delete[] DecomAddress;
+					delete[] OutputImage;
+					MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+					return -2;
+				}
+			}
+
+
+			// write result to output file
+			ErrNum = _wfopen_s(&Out, NewFilename, L"wb");
+			if (!Out) {
+				delete[] DecomY;
+				delete[] DecomX;
+				delete[] InputImage;
+				delete[] DecomAddress;
+				delete[] OutputImage;
+				MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
+				return -2;
+			}
+		}
+		else {
+			// write result to output file
+			ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
+			if (!Out) {
+				delete[] DecomY;
+				delete[] DecomX;
+				delete[] InputImage;
+				delete[] DecomAddress;
+				delete[] OutputImage;
+				MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
+				return -2;
+			}
+		}
+
+		// write imgheader record out, no parameters in the header have changed
+
+		fwrite(&ImgHeader, sizeof(ImgHeader), 1, Out);
+
+		// write image
+		for (int i = 0; i < (FrameSize * ImgHeader.NumFrames); i++) {
+			Pixel.Long = OutputImage[i];
+			if (ImgHeader.PixelSize == 1) {
+				if (Pixel.Long > 255) Pixel.Long = 255;
+				fwrite(&Pixel.Byte, 1, 1, Out);
+			}
+			else if (ImgHeader.PixelSize == 2) {
+				if (Pixel.Long > 65535) Pixel.Long = 65535;
+				fwrite(&Pixel.uShort, 2, 1, Out);
+			}
+			else {
+				fwrite(&Pixel.Long, 4, 1, Out);
+			}
+		}
+		fclose(Out);
+
+		if (EnableBatch && GenerateBMP) {
+			SaveBMP(BMPfilename, NewFilename, FALSE, TRUE);
+		}
+
+	}
+	delete[] DecomY;
+	delete[] DecomX;
+	delete[] InputImage;
+	delete[] DecomAddress;
+	delete[] OutputImage;
+
+	if (DisplayResults && !EnableBatch) {
+		DisplayImage(OutputFile);
+	}
+
+	return 1;
+}
+
+//******************************************************************************
+//
+// ComputeBlockReordering
+// 
+// private function for BlockReorder()
+//
+// This function compute the address remap for rearranging block in an image
+// The image is made up of block which are BlockXsize by BlockYsize
+// The image is made of of xsize/BlockXsize blocks in the horizontal direction
+// The image is made of of ysize/BlockYsize blocks in the horizontal direction
+// For example: a 256x256 image with a block size of 8x8 is made up of 32x32 blocks
+// 
+// The size of the decom list is (xsize/BlockXsize) * (ysize/BlockYsize)
+// 
+// The decom list specified how to rearrange the blocks in the image
+// 
+//*******************************************************************************
+void ComputeBlockReordering(
+	int* DecomAddress,	// address of Decom address list (allocated before calling this function)
+	int xsize,			// image x size
+	int ysize,			// image y size
+						// Decom list in in x,y pairs
+						//	the length of the pairs arrays is DecomXsize*DecomYsize
+	int* DecomX,		// address of decom x pairs
+	int* DecomY,		// address of decom y pairs
+	int DecomXsize,		// x size of decom kernel
+	int DecomYsize,		// y size of decom kernel
+	int BlockXsize,		// x size of a block
+	int BlockYsize		// y size of a block
+)
+{
+	int DcmAddress = 0;
+	int CalculatedAddress = 0;
+	int TotalSize;  // to make sure new address never exceeds the image size
+	int Ykernel, Xkernel;
+	int DecomXYindex;
+	int Offset;
+	int Doffset;
+	int BlockOffset;
+	int DecomOffset;
+	int NumXblocks;
+	int NumYblocks;
+
+	TotalSize = xsize * ysize; // image size, DecomAddress size
+	
+	// subdivide the image into blocks which are BlockXsize by BlockYsize
+	NumXblocks = xsize / BlockXsize;
+	NumYblocks = ysize / BlockYsize;
+
+	for (int i = 0; i < NumYblocks; i++) {
+		// i is the current y block number
+		for (int j = 0; j < NumXblocks; j++) {
+			// j is the current x block number
+			DecomXYindex = j + (i * NumXblocks);
+			Xkernel = j + DecomX[DecomXYindex];
+			Ykernel = i + DecomY[DecomXYindex];
+
+			// this is the block being moved
+			Offset = (Xkernel * BlockXsize) + (Ykernel * BlockYsize * xsize);
+			
+			// this is the linear block order (left to right, top to bottom)
+			Doffset = (j * BlockXsize) + (i * BlockYsize * xsize);
+
+			for (int y = 0; y < BlockYsize; y++) {
+				BlockOffset = Offset + y * xsize;
+				DecomOffset = Doffset + y * xsize;
+				for (int x = 0; x < BlockXsize; x++) {
+					CalculatedAddress = BlockOffset + x;
+					if (CalculatedAddress < 0) CalculatedAddress = 0; // make sure address is not < 0
+					DcmAddress = DecomOffset + x;
+					if (DcmAddress < 0) DcmAddress = 0;
+					if (DcmAddress >= TotalSize) DcmAddress = DcmAddress % TotalSize;
+					DecomAddress[DcmAddress] = CalculatedAddress % TotalSize; // limit address to image size
+				}
+			}
+		}
+	}
+
+	return;
 }
