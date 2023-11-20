@@ -68,6 +68,8 @@
 //						Correction, PixelReorder, fixed correct output for 2 and 4 byte pixels
 //						Changed, PixelReorder,  Added inverse reorder transform
 // V1.2.11.1 2023-11-7	Added, ComputeBlockReordering and BlockReorder
+// V1.2.12.1 2023-11-15	Changed, Resize image, Added 0 settings to indicate to use original setting
+//						Correction, Extract image, fixed error when extracting multiple frames
 //
 #include "framework.h"
 #include "stdio.h"
@@ -588,8 +590,8 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 		for (int i = 0, y = Starty; i < SubimageYsize; i++, y++) {
 			if (y < 0) continue;
 			if (y >= InputHeader.Ysize) break;
-			SubAddress = i * SubimageXsize + InputOffset;
-			Address = y * InputHeader.Xsize + OutputOffset;
+			SubAddress = i * SubimageXsize + OutputOffset;
+			Address = y * InputHeader.Xsize + InputOffset;
 			for (int j = 0, x = Startx; j < SubimageXsize; j++, x++, SubAddress++) {
 				if ((x < 0) || (x > InputHeader.Xsize)) {
 					continue;
@@ -3162,8 +3164,16 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 	errno_t ErrNum;
 	PIXEL Pixel;
 	FILE* Out;
+	int iRes;
 
-	LoadImageFile(&InputImage, InputFile, &ImageHeader);
+	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
+	if (iRes != 1) {
+		return iRes;
+	}
+	if (Xsize == 0) Xsize = ImageHeader.Xsize;
+	if (Ysize == 0) Ysize = ImageHeader.Ysize;
+	if (PixelSize == 0) PixelSize = ImageHeader.PixelSize;
+
 	if (ImageHeader.Xsize * ImageHeader.Ysize != Xsize * Ysize) {
 		delete[] InputImage;
 		return 0;

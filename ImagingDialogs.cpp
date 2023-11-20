@@ -48,6 +48,7 @@
 //                      Changed, Added Invert algorithm to reorder by algorithm dialog
 // V1.2.10.1 2023-11-5  Changed, Reordering by algorithm, added split image left/right
 // V1.2.11.1 2023-11-7  Added, new dialog, Reorder blocks[MxM] in image using kernel
+// V1.2.12.1 2023-11-20 Added, Batch extract image dialog
 // 
 // Imaging tools dialog box handlers
 // 
@@ -4899,3 +4900,439 @@ INT_PTR CALLBACK AddKernelDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
     return (INT_PTR)FALSE;
 }
 
+//*******************************************************************************
+//
+// Message handler for BatchExtractImageDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+        IMAGINGHEADER ImageHeader;
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"ImageInput", L"Message.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+        if (ReadImageHeader(szString, &ImageHeader) == 1) {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+        }
+        else {
+            SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+            SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+        }
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"ImageOutput", L"Extracted.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"xsize", L"512", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XSIZE, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"ysize", L"512", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YSIZE, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"OutputXsize", L"512", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_OUTPUT_XSIZE, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"OutputYsize", L"512", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_OUTPUT_YSIZE, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"StartFrame", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_START_FRAME, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"EndFrame", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_END_FRAME, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"xlocStart", L"61", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XLOC_START, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"ylocStart", L"36", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YLOC_START, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"xlocEnd", L"69", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XLOC_END, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"ylocEnd", L"55", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YLOC_END, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"xlocOffset", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XLOC_OFFSET, szString);
+
+        GetPrivateProfileString(L"BatchExtractImageDlg", L"ylocOffset", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YLOC_OFFSET, szString);
+
+
+        int ScalePixel;
+        int Centered;
+        int GenerateBMP;
+        int GenerateFileList;
+
+        ScalePixel = GetPrivateProfileInt(L"BatchExtractImageDlg", L"ScalePixel", 0, (LPCTSTR)strAppNameINI);
+        if (!ScalePixel) {
+            CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_SCALE_PIXEL, BST_CHECKED);
+        }
+
+        Centered = GetPrivateProfileInt(L"BatchExtractImageDlg", L"Centered", 1, (LPCTSTR)strAppNameINI);
+        if (!Centered) {
+            CheckDlgButton(hDlg, IDC_CENTERED, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_CENTERED, BST_CHECKED);
+        }
+
+        GenerateBMP = GetPrivateProfileInt(L"BatchExtractImageDlg", L"GenerateBMP", 0, (LPCTSTR)strAppNameINI);
+        if (!GenerateBMP) {
+            CheckDlgButton(hDlg, IDC_GENERATE_BMP, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_GENERATE_BMP, BST_CHECKED);
+        }
+
+        GenerateFileList = GetPrivateProfileInt(L"BatchExtractImageDlg", L"GenerateFileList", 0, (LPCTSTR)strAppNameINI);
+        if (!GenerateFileList) {
+            CheckDlgButton(hDlg, IDC_GENERATE_FILELIST, BST_UNCHECKED);
+        }
+        else {
+            CheckDlgButton(hDlg, IDC_GENERATE_FILELIST, BST_CHECKED);
+        }
+        
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_IMAGE_INPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            IMAGINGHEADER ImageHeader;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileOpen(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString);
+
+            if (ReadImageHeader(szString, &ImageHeader) == 1) {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, ImageHeader.Xsize, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, ImageHeader.Ysize, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, ImageHeader.NumFrames, TRUE);
+                SetDlgItemInt(hDlg, IDC_START_FRAME, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_END_FRAME, ImageHeader.NumFrames - 1, TRUE);
+            }
+            else {
+                SetDlgItemInt(hDlg, IDC_XSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_YSIZEI, 0, TRUE);
+                SetDlgItemInt(hDlg, IDC_NUM_FRAMES, 0, TRUE);
+                MessageBox(hDlg, L"Selected file is not an image file", L"File incompatible", MB_OK);
+            }
+
+            return (INT_PTR)TRUE;
+        }
+        case IDC_EXTRACT_OUTPUT_FILE_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC rawType[] =
+            {
+                 { L"text files", L"*.raw" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, rawType, L"*.raw")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_EXTRACT:
+        {
+            BOOL bSuccess;
+            WCHAR InputFile[MAX_PATH];
+            WCHAR OutputFile[MAX_PATH];
+            int xsize = 0;
+            int ysize = 0;
+            int SubimageXlocStart = 0;
+            int SubimageYlocStart = 0;
+            int SubimageXlocEnd = 0;
+            int SubimageYlocEnd = 0;
+            int SubimageXlocOffset = 0;
+            int SubimageYlocOffset = 0;
+            int SubimageXloc = 0;
+            int SubimageYloc = 0;
+            int SubimageXsize = 0;
+            int SubimageYsize = 0;
+            int OutputXsize = 0;
+            int OutputYsize = 0;
+            int ScaleBinary = 0;
+            int Centered = 0;
+            int StartFrame = 0;
+            int EndFrame = 0;
+            int GenerateBMP = 0;
+            int GenerateFileList = 0;
+
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, InputFile, MAX_PATH);
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
+            SubimageXsize = GetDlgItemInt(hDlg, IDC_XSIZE, &bSuccess, TRUE);
+            SubimageYsize = GetDlgItemInt(hDlg, IDC_YSIZE, &bSuccess, TRUE);
+            SubimageXlocStart = GetDlgItemInt(hDlg, IDC_XLOC_START, &bSuccess, TRUE);
+            SubimageYlocStart = GetDlgItemInt(hDlg, IDC_YLOC_START, &bSuccess, TRUE);
+            SubimageXlocEnd = GetDlgItemInt(hDlg, IDC_XLOC_END, &bSuccess, TRUE);
+            SubimageYlocEnd = GetDlgItemInt(hDlg, IDC_YLOC_END, &bSuccess, TRUE);
+            SubimageXlocOffset = GetDlgItemInt(hDlg, IDC_XLOC_OFFSET, &bSuccess, TRUE);
+            SubimageYlocOffset = GetDlgItemInt(hDlg, IDC_YLOC_OFFSET, &bSuccess, TRUE);
+            StartFrame = GetDlgItemInt(hDlg, IDC_START_FRAME, &bSuccess, TRUE);
+            EndFrame = GetDlgItemInt(hDlg, IDC_END_FRAME, &bSuccess, TRUE);
+            OutputXsize = GetDlgItemInt(hDlg, IDC_OUTPUT_XSIZE, &bSuccess, TRUE);
+            OutputYsize = GetDlgItemInt(hDlg, IDC_OUTPUT_YSIZE, &bSuccess, TRUE);
+            if (IsDlgButtonChecked(hDlg, IDC_CENTERED) == BST_CHECKED) {
+                Centered = 1;
+            }
+            if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
+                ScaleBinary = 1;
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
+                GenerateBMP = 1;
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_GENERATE_FILELIST) == BST_CHECKED) {
+                GenerateFileList = 1;
+            }
+
+            int SaveDisplayResults;
+
+            SaveDisplayResults = DisplayResults;
+            DisplayResults = 0;
+
+            // for Batch processing, cutup filename, reassemble as needed
+            int err;
+            WCHAR Drive[_MAX_DRIVE];
+            WCHAR Dir[_MAX_DIR];
+            WCHAR Fname[_MAX_FNAME];
+            WCHAR Ext[_MAX_EXT];
+            WCHAR NewFilename[MAX_PATH];
+
+            // split apart original filename
+            err = _wsplitpath_s(OutputFile, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
+                _MAX_FNAME, Ext, _MAX_EXT);
+            if (err != 0) {
+                MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
+                return -2;
+            }
+
+            FILE* FileList = NULL;
+            FILE* BatchFileList = NULL;
+            WCHAR NewFname[_MAX_FNAME];
+
+            if (GenerateFileList) {
+                errno_t ErrNum;
+
+                // reassemble filename for filelist
+                err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, L"FileList", L".txt");
+                if (err != 0) {
+                    MessageBox(hDlg, L"Could not creat output filename", L"Batch filename", MB_OK);
+                    return -2;
+                }
+
+                ErrNum = _wfopen_s(&FileList, NewFilename, L"w");
+                if (FileList == NULL) {
+                    MessageBox(hDlg, L"Could not open file list output file", L"File I/O", MB_OK);
+                    return -2;
+                }
+
+                // reassemble filename for batch file
+                err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, L"BatchFileList", L".txt");
+                if (err != 0) {
+                    MessageBox(hDlg, L"Could not creat output filename", L"Batch filename", MB_OK);
+                    return -2;
+                }
+
+                ErrNum = _wfopen_s(&BatchFileList, NewFilename, L"w");
+                if (FileList == NULL) {
+                    MessageBox(hDlg, L"Could not open file list output file", L"File I/O", MB_OK);
+                    return -2;
+                }
+
+            }
+
+            for (SubimageYloc = SubimageYlocStart; SubimageYloc <= SubimageYlocEnd; SubimageYloc++) {
+                for (SubimageXloc = SubimageXlocStart; SubimageXloc <= SubimageXlocEnd; SubimageXloc++) {
+                    // add loc ID to filename
+
+                    swprintf_s(NewFname, _MAX_FNAME, L"%s %d-%d", Fname, SubimageXloc, SubimageYloc);
+
+                    // reassemble filename for extracted image file
+                    err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, NewFname, Ext);
+                    if (err != 0) {
+                        MessageBox(hDlg, L"Could not creat output filename", L"Batch filename", MB_OK);
+                        if (FileList != NULL) {
+                            fclose(FileList);
+                        }
+                        return -2;
+                    }
+
+                    err = ImageExtract(hDlg, InputFile, NewFilename,
+                        ScaleBinary, SubimageXloc + SubimageXlocOffset, SubimageYloc + SubimageYlocOffset, StartFrame, EndFrame,
+                        SubimageXsize, SubimageYsize,
+                        OutputXsize, OutputYsize, Centered);
+                    if (err != 1) {
+                        if (FileList != NULL) {
+                            fclose(FileList);
+                        }
+                        MessageMySETIappError(hDlg, err, L"Batch extract image");
+                        return (INT_PTR)TRUE;
+                    }
+
+                    if (FileList != NULL) {
+                        fwprintf_s(FileList, L"%s\n", NewFilename);
+                    }
+                    if (BatchFileList) {
+                        fwprintf_s(BatchFileList, L"%s\n", NewFilename);
+                        // reassemble filename batch directory location
+                        swprintf_s(NewFname, _MAX_FNAME, L"Batch\\%s %d-%d", Fname, SubimageXloc, SubimageYloc);
+                        err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, NewFname, Ext);
+                        if (err != 0) {
+                            MessageBox(hDlg, L"Could not creat output filename", L"Batch filename", MB_OK);
+                            if (FileList != NULL) {
+                                fclose(FileList);
+                            }
+                            return -2;
+                        }
+                        fwprintf_s(BatchFileList, L"%s\n\n", NewFilename);
+                    }
+
+                    if (GenerateBMP == 1) {
+                        WCHAR BMPfilename[MAX_PATH];
+                        // reassemble filename
+                        err = _wmakepath_s(BMPfilename, _MAX_PATH, Drive, Dir, NewFname, L".bmp");
+                        if (err != 0) {
+                            if (FileList != NULL) {
+                                fclose(FileList);
+                            }
+                            MessageBox(hDlg, L"Could not creat output bmp filename", L"Batch filename", MB_OK);
+                            return -2;
+                        }
+                        SaveBMP(BMPfilename, NewFilename, DefaultRBG, AutoScaleResults);
+
+
+                    }
+                }
+            }
+
+            if (FileList != NULL) {
+                fclose(FileList);
+            }
+            if (BatchFileList != NULL) {
+                fclose(BatchFileList);
+            }
+
+            DisplayResults = SaveDisplayResults;
+            MessageBox(hDlg, L"Completed", L"Success",MB_OK);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+        {
+            GetDlgItemText(hDlg, IDC_IMAGE_INPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"ImageInput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"ImageOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"xsize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"ysize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_START_FRAME, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"StartFrame", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_END_FRAME, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"EndFrame", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XLOC_START, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"xlocStart", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YLOC_START, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"ylocStart", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XLOC_END, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"xlocEnd", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YLOC_END, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"ylocEnd", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XLOC_OFFSET, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"xlocOffset", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YLOC_OFFSET, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"ylocOffset", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_OUTPUT_XSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"OutputXsize", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_OUTPUT_YSIZE, szString, MAX_PATH);
+            WritePrivateProfileString(L"BatchExtractImageDlg", L"OutputYsize", szString, (LPCTSTR)strAppNameINI);
+
+            if (IsDlgButtonChecked(hDlg, IDC_CENTERED) == BST_CHECKED) {
+                WritePrivateProfileString(L"BatchExtractImageDlg", L"Centered", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BatchExtractImageDlg", L"Centered", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_SCALE_PIXEL) == BST_CHECKED) {
+                WritePrivateProfileString(L"BatchExtractImageDlg", L"ScalePixel", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BatchExtractImageDlg", L"ScalePixel", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_GENERATE_BMP) == BST_CHECKED) {
+                WritePrivateProfileString(L"BatchExtractImageDlg", L"GenerateBMP", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BatchExtractImageDlg", L"GenerateBMP", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            if (IsDlgButtonChecked(hDlg, IDC_GENERATE_FILELIST) == BST_CHECKED) {
+                WritePrivateProfileString(L"BatchExtractImageDlg", L"GenerateFileList", L"1", (LPCTSTR)strAppNameINI);
+            }
+            else {
+                WritePrivateProfileString(L"BatchExtractImageDlg", L"GenerateFileLIst", L"0", (LPCTSTR)strAppNameINI);
+            }
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}

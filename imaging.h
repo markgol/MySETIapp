@@ -8,7 +8,7 @@ typedef struct IMAGINGHEADER {
 	short HeaderSize;	// number of bytes in header
 	LONG32 Xsize;			// number of columns in image (type long allows for long linear bitstreams)
 	LONG32 Ysize;			// number of rows image
-	short PixelSize;	// pixel size, 1-byte, 2-int16 (short), 4-int32 (int)
+	short PixelSize;	// pixel size, 1-byte (uchar), 2-uint16 (ushort), 4-int32 (int)
 	short NumFrames;	// Number of image frames in the file
 	short Version;		// header version  number
 						// 1 - this 32 byte header

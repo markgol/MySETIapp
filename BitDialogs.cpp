@@ -2005,3 +2005,88 @@ INT_PTR CALLBACK ExtractSPPDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
     }
     return (INT_PTR)FALSE;
 }
+
+//*******************************************************************************
+//
+// Message handler for FindAPrimeDlg dialog box.
+// 
+//*******************************************************************************
+INT_PTR CALLBACK FindAPrimeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+        WCHAR szString[MAX_PATH];
+
+    case WM_INITDIALOG:
+    {
+        GetPrivateProfileString(L"FindAPrimeDlg", L"TextOutput", L"PrimeNumberList.txt", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
+
+        GetPrivateProfileString(L"FindAPrimeDlg", L"Start", L"2", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_START, szString);
+
+        GetPrivateProfileString(L"FindAPrimeDlg", L"End", L"65536", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_END, szString);
+
+        return (INT_PTR)TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_TEXT_OUTPUT_BROWSE:
+        {
+            PWSTR pszFilename;
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString, MAX_PATH);
+            COMDLG_FILTERSPEC textType[] =
+            {
+                 { L"text stream files", L"*.txt" },
+                 { L"All Files", L"*.*" },
+            };
+            if (!CCFileSave(hDlg, szString, &pszFilename, FALSE, 2, textType, L"*.txt")) {
+                return (INT_PTR)TRUE;
+            }
+            {
+                wcscpy_s(szString, pszFilename);
+                CoTaskMemFree(pszFilename);
+            }
+            SetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString);
+            return (INT_PTR)TRUE;
+        }
+
+        case IDC_CALCULATE:
+        {
+            BOOL bSuccess;
+            WCHAR OutputFile[MAX_PATH];
+            int Start;
+            int End;
+
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, OutputFile, MAX_PATH);
+
+            Start = GetDlgItemInt(hDlg, IDC_START, &bSuccess, TRUE);
+            End = GetDlgItemInt(hDlg, IDC_END, &bSuccess, TRUE);
+
+            FindAPrime(hDlg, OutputFile, Start, End);
+
+            return (INT_PTR)TRUE;
+        }
+
+        case IDOK:
+            GetDlgItemText(hDlg, IDC_TEXT_OUTPUT, szString, MAX_PATH);
+            WritePrivateProfileString(L"FindAPrimeDlg", L"TextOutput", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_START, szString, MAX_PATH);
+            WritePrivateProfileString(L"FindAPrimeDlg", L"Start", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_END, szString, MAX_PATH);
+            WritePrivateProfileString(L"FindAPrimeDlg", L"End", szString, (LPCTSTR)strAppNameINI);
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+
+        case IDCANCEL:
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+    }
+    return (INT_PTR)FALSE;
+}

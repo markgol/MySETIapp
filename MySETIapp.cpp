@@ -144,7 +144,10 @@
 //                      Changed, global Setting, added auto save PNG flag when creating a BMP file  
 //                      Changed, ExportBMP, added automatically saving a matching .png using a global flag
 //                      Changed, all Reordering dialogs.  Added inverse transform option 
-// V1.2.11.1 2023-11-7  Added, new dialog, Reorder blocks[MxM] in image             
+// V1.2.11.1 2023-11-7  Added, new dialog, Reorder blocks[MxM] in image
+// V1.2.12.1 2023-11-20 Added prime number calculator
+//                      Correction, fixed extract image when extracting multiframe files.
+//                      Added, Batch extract image            
 // 
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -252,6 +255,8 @@ INT_PTR CALLBACK    RemoveNULLsDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ReorderImageBatchDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    AddKernelDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ReorderBlocksImageDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    FindAPrimeDlg(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    BatchExtractImageDlg(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -568,6 +573,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_EXTRACT), hWnd, ExtractImageDlg);
                 break;
 
+            case IDM_IMGTOOLS_EXTRACTBATCH:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_EXTRACTBATCH), hWnd, BatchExtractImageDlg);
+                break;
+
             case IDM_IMGTOOLS_EXTRACT_PACKETS:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_IMGTOOLS_EXTRACT_SYMBOLS), hWnd, ExtractSymbolsDlg);
                 break;
@@ -672,6 +681,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTINGS), hWnd, GlobalSettingsDlg);
                 break;
 
+            case IDM_PROPERTIES_FINDAPRIME:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_PROPERTIES_FINDAPRIME), hWnd, FindAPrimeDlg);
+                break;
+                
             case IDM_EXIT:
                 DestroyWindow(hWnd);
                 break;

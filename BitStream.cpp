@@ -1833,3 +1833,49 @@ void RemoveNULLbytes(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int NULLval
 
     return;
 }
+
+//*******************************************************************
+//
+//  FindAPrime
+// 
+// First experiment with ChatGPT writing code
+//
+//*******************************************************************
+int is_prime(int num);
+
+int FindAPrime(HWND hDlg, WCHAR* Filename, int Start, int End)
+{
+    FILE* Out;
+    errno_t ErrNum;
+  
+    ErrNum = _wfopen_s(&Out, Filename, L"w");
+    if (Out == NULL) {
+        MessageBox(hDlg, L"Could not open raw output file", L"File I/O", MB_OK);
+        return -2;
+    }
+
+    fprintf(Out, "Prime numbers between %d and %d:\n", Start, End);
+
+    for (int i = Start, j=1; i <= End; ++i) {
+        if (is_prime(i)) {
+            fprintf(Out, "%d: %d\n",j,i);
+            j++;
+        }
+    }
+    fclose(Out);
+    return 1;
+}
+
+// from ChatGPT, simple prime calcuator, only good for smaller prime numbers
+// Function to check if a number is prime
+int is_prime(int num) {
+    if (num <= 1) {
+        return 0;  // Not prime
+    }
+    for (int i = 2; i * i <= num; ++i) {
+        if (num % i == 0) {
+            return 0;  // Not prime
+        }
+    }
+    return 1;  // Prime
+}

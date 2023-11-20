@@ -4,12 +4,12 @@
 //
 #define IDC_MYICON                      2
 #define IDD_MYSETIAPP_DIALOG            102
-#define IDS_APP_TITLE                   103
-#define IDD_ABOUTBOX                    103
-#define IDM_ABOUT                       104
-#define IDM_EXIT                        105
-#define IDI_MYSETIAPP                   107
-#define IDC_MYSETIAPP                   109
+#define IDS_APP_TITLE                   104
+#define IDD_ABOUTBOX                    105
+#define IDM_ABOUT                       106
+#define IDM_EXIT                        108
+#define IDI_MYSETIAPP                   110
+#define IDC_MYSETIAPP                   112
 #define IDR_MAINFRAME                   128
 #define IDD_BITTOOLS_TEXT_STREAM        129
 #define IDD_BITTOOLS_HEX_DUMP           130
@@ -44,8 +44,6 @@
 #define IDD_IMGTOOLS_STDDECIMATION      160
 #define IDD_IMGTOOLS_REPLICATION        161
 #define IDD_IMGTOOLS_REORDER_ALG        162
-#define IDD_BITTOOLS_EXTRACT_Packets    163
-#define IDD_BITTOOLS_EXTRACT_SYMBOLS    163
 #define IDD_IMGTOOLS_EXTRACT_SYMBOLS    163
 #define IDD_IMGTOOLS_INSERT_IMAGE       164
 #define IDD_BITTOOLS_SPP_EXTRACT        165
@@ -54,6 +52,8 @@
 #define IDD_IMGTOOLS_REORDER_BATCH      168
 #define IDD_IMGTOOLS_ADD_KERNEL         169
 #define IDD_IMGTOOLS_REORDER_BLOCKS     170
+#define IDD_PROPERTIES_FINDAPRIME       171
+#define IDD_IMGTOOLS_EXTRACTBATCH       172
 #define IDC_APID                        1060
 #define IDC_HEADER2SIZE                 1061
 #define IDC_TEXT_OUTPUT2                1062
@@ -74,7 +74,6 @@
 #define IDC_IMAGE_INPUT                 1078
 #define IDC_IMAGE_OUTPUT                1079
 #define IDC_IMAGE_OUTPUT_BROWSE         1080
-#define IDC_IMAGE_INPUT2                1081
 #define IDC_BATCH_INPUT                 1081
 #define IDC_BATCH_INPUT_BROWSE          1082
 #define IDC_IMAGE_CONV_SCALE_BIN        1083
@@ -116,13 +115,17 @@
 #define IDC_BIT_DEPTH                   1131
 #define IDC_XLOC                        1132
 #define IDC_PIXEL_SIZEI                 1133
+#define IDC_XLOC_END                    1133
 #define IDC_YLOC                        1134
 #define IDC_CENTERED                    1135
 #define IDC_FOLD                        1136
+#define IDC_YLOC_END                    1136
 #define IDC_END_FRAME                   1137
 #define IDC_TEXT_INPUT                  1138
+#define IDC_XLOC_OFFSET                 1138
 #define IDC_START_FRAME                 1139
 #define IDC_CONVOLVE                    1140
+#define IDC_YLOC_OFFSET                 1140
 #define IDC_INCR_FRAMES                 1141
 #define IDC_TEXT_INPUT_BROWSE           1142
 #define IDC_FOLD_NUMBER                 1143
@@ -158,6 +161,8 @@
 #define IDC_VALUE                       1171
 #define IDC_GENERATE_BMP                1172
 #define IDC_INVERT                      1173
+#define IDC_GENERATE_BMP2               1173
+#define IDC_GENERATE_FILELIST           1173
 #define IDC_BATCH                       1174
 #define IDC_XSIZE_END                   1175
 #define IDC_XDECIMATE                   1176
@@ -176,6 +181,12 @@
 #define IDC_OVERWRITE                   1189
 #define IDC_P3                          1222
 #define IDC_NULL_LENGTH                 1277
+#define IDC_IMAGE_INPUT2                1281
+#define IDC_START                       1300
+#define IDC_END                         1301
+#define IDC_CALCULATE                   1302
+#define IDC_XLOC_START                  1303
+#define IDC_YLOC_START                  1304
 #define IDM_BITTOOLS_TEXT_IMAGE         32795
 #define IDM_BITTOOLS_HEXDUMP            32796
 #define IDM_BITTOOLS_TEXT_STREAM        32797
@@ -234,6 +245,13 @@
 #define IDM_IMGTOOLS_ADD_KERNEL         32902
 #define IDM_IMAGETOOLS_REORDER_BLOCKS   32904
 #define IDM_IMGTOOLS_REORDER_BLOCKS     32905
+#define ID_PROPERTIES_FINDAPRIME        32906
+#define IDM_PROPERTIES_FINDAPRIME       32907
+#define ID_IMAGETOOLS_BATCHEXTRACTIMAGE 32908
+#define IDM_IMAGETOOLS_BATCHEXTRACTIMAGE 32909
+#define IDM_IMAGETOOLS_BATCHEXTRACT     32910
+#define IDM_IMGTOOLS_BATCHEXTRACT       32911
+#define IDM_IMGTOOLS_EXTRACTBATCH       32912
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -241,9 +259,9 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
-#define _APS_NEXT_RESOURCE_VALUE        138
-#define _APS_NEXT_COMMAND_VALUE         32906
-#define _APS_NEXT_CONTROL_VALUE         1083
-#define _APS_NEXT_SYMED_VALUE           110
+#define _APS_NEXT_RESOURCE_VALUE        200
+#define _APS_NEXT_COMMAND_VALUE         32913
+#define _APS_NEXT_CONTROL_VALUE         1305
+#define _APS_NEXT_SYMED_VALUE           300
 #endif
 #endif

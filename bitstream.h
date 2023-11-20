@@ -41,3 +41,5 @@ uint16_t ByteSwap(uint16_t Value);
 
 void RemoveNULLbytes(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int NULLvalue,
                     int NullLength, int SkipBytes);
+
+int FindAPrime(HWND hDlg, WCHAR* Filename, int Start, int End);
