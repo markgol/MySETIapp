@@ -49,6 +49,7 @@
 // V1.2.10.1 2023-11-5  Changed, Reordering by algorithm, added split image left/right
 // V1.2.11.1 2023-11-7  Added, new dialog, Reorder blocks[MxM] in image using kernel
 // V1.2.12.1 2023-11-20 Added, Batch extract image dialog
+// V1.2.12.2 2023-11-21 Correction, filename buffer overwrite corrected when generating batchfilelist.txt
 // 
 // Imaging tools dialog box handlers
 // 
@@ -5105,6 +5106,9 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
             EndFrame = GetDlgItemInt(hDlg, IDC_END_FRAME, &bSuccess, TRUE);
             OutputXsize = GetDlgItemInt(hDlg, IDC_OUTPUT_XSIZE, &bSuccess, TRUE);
             OutputYsize = GetDlgItemInt(hDlg, IDC_OUTPUT_YSIZE, &bSuccess, TRUE);
+            if (SubimageXlocEnd < SubimageXlocStart) SubimageXlocEnd = SubimageXlocStart;
+            if (SubimageYlocEnd < SubimageYlocStart) SubimageYlocEnd = SubimageYlocStart;
+
             if (IsDlgButtonChecked(hDlg, IDC_CENTERED) == BST_CHECKED) {
                 Centered = 1;
             }
@@ -5203,15 +5207,18 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
                         MessageMySETIappError(hDlg, err, L"Batch extract image");
                         return (INT_PTR)TRUE;
                     }
-
+                    
                     if (FileList != NULL) {
                         fwprintf_s(FileList, L"%s\n", NewFilename);
                     }
+                    
                     if (BatchFileList) {
+                        WCHAR BatchFname[MAX_PATH];
+                        WCHAR BatchListName[MAX_PATH];
                         fwprintf_s(BatchFileList, L"%s\n", NewFilename);
                         // reassemble filename batch directory location
-                        swprintf_s(NewFname, _MAX_FNAME, L"Batch\\%s %d-%d", Fname, SubimageXloc, SubimageYloc);
-                        err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, NewFname, Ext);
+                        swprintf_s(BatchFname, _MAX_FNAME, L"Batch\\%s %d-%d", Fname, SubimageXloc, SubimageYloc);
+                        err = _wmakepath_s(BatchListName, _MAX_PATH, Drive, Dir, BatchFname, Ext);
                         if (err != 0) {
                             MessageBox(hDlg, L"Could not creat output filename", L"Batch filename", MB_OK);
                             if (FileList != NULL) {
@@ -5219,7 +5226,7 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
                             }
                             return -2;
                         }
-                        fwprintf_s(BatchFileList, L"%s\n\n", NewFilename);
+                        fwprintf_s(BatchFileList, L"%s\n\n", BatchListName);
                     }
 
                     if (GenerateBMP == 1) {

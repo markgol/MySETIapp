@@ -147,7 +147,8 @@
 // V1.2.11.1 2023-11-7  Added, new dialog, Reorder blocks[MxM] in image
 // V1.2.12.1 2023-11-20 Added prime number calculator
 //                      Correction, fixed extract image when extracting multiframe files.
-//                      Added, Batch extract image            
+//                      Added, Batch extract image
+// V1.2.12.2 2023-11-21 Correction, filename buffer overwrite corrected when generating batchfilelist.txt            
 // 
 // MySETIapp.cpp : Defines the entry point for the application.
 //
