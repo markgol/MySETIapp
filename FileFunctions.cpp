@@ -60,6 +60,9 @@
 // V1.2.8.1 2023-10-18  Add filesize function
 // V1.2.10.1 2023-11-5  Changed, Export file, output file default is same as input file with .bmp extension
 //                      Changed, ExportBMP, added automatically saving a matching .png using a global flag  
+// V1.3.1.1 2023-12-6   Corrected setting options in FileOpen and FileSave.  This does not have actual impact
+//                      on the existing application since it doesn't use the Folders only option.
+//                      Replaced application error numbers with #define to improve clarity
 //
 #include "framework.h"
 #include "resource.h"
@@ -68,10 +71,12 @@
 #include <vector>
 #include <atlstr.h>
 #include <gdiplus.h>
-#include "globals.h"
 #include <strsafe.h>
-#include "FileFunctions.h"
+#include "AppErrors.h"
+#include "ImageDialog.h"
+#include "globals.h"
 #include "imaging.h"
+#include "FileFunctions.h"
 
 //****************************************************************
 //
@@ -175,7 +180,7 @@ if (SUCCEEDED(hr))
         }
 
         if (!bSelectFolder) {
-            hr = pFileOpen->SetOptions(FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST);
+            hr = pFileOpen->SetOptions(FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
             if (NumTypes != 0 && FileTypes!=NULL) {
                 hr = pFileOpen->SetFileTypes(NumTypes, FileTypes);
             }
@@ -206,7 +211,7 @@ if (SUCCEEDED(hr))
             }
 
         } else {
-            hr = pFileOpen->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST); // This selects only a folder, not a filename
+            hr = pFileOpen->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST); // This selects only a folder, not a filename
         }
 
         // Show the Open dialog box.
@@ -342,7 +347,7 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
             }
 
             if (!bSelectFolder) {
-                hr = pFileSave->SetOptions(FOS_FORCEFILESYSTEM | FOS_OVERWRITEPROMPT || FOS_PATHMUSTEXIST);
+                hr = pFileSave->SetOptions(FOS_FORCEFILESYSTEM | FOS_OVERWRITEPROMPT | FOS_PATHMUSTEXIST);
                 if (NumTypes != 0 && FileTypes != NULL) {
                     hr = pFileSave->SetFileTypes(NumTypes, FileTypes);
                 }
@@ -373,7 +378,7 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
                 }
 
             } else {
-                hr = pFileSave->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM || FOS_PATHMUSTEXIST); // This selects only a folder, not a filename
+                hr = pFileSave->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST); // This selects only a folder, not a filename
             }
                      
             // Show the Open dialog box.
@@ -407,306 +412,6 @@ BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
 
 //****************************************************************
 //
-// Saves the position of a window
-//
-//****************************************************************
-void SaveWindowPlacement(HWND hWnd, CString &Section)
-{
-    CString csString;
-    // save window size and location for next time
-    WINDOWPLACEMENT MainWindowPlacement;
-    GetWindowPlacement(hWnd, &MainWindowPlacement);
-    csString.Format(L"%u", MainWindowPlacement.showCmd);
-    WritePrivateProfileString(Section, L"showCmd", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%u", MainWindowPlacement.flags);
-    WritePrivateProfileString(Section, L"flags", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%ld", MainWindowPlacement.ptMaxPosition.x);
-    WritePrivateProfileString(Section, L"ptMaxPosition.x", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%ld", MainWindowPlacement.ptMaxPosition.y);
-    WritePrivateProfileString(Section, L"ptMaxPosition.y", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%ld", MainWindowPlacement.ptMinPosition.x);
-    WritePrivateProfileString(Section, L"ptMinPosition.x", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%ld", MainWindowPlacement.ptMinPosition.y);
-    WritePrivateProfileString(Section, L"ptMinPosition.y", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%ld", MainWindowPlacement.rcNormalPosition.bottom);
-    WritePrivateProfileString(Section, L"bottom", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%ld", MainWindowPlacement.rcNormalPosition.left);
-    WritePrivateProfileString(Section, L"left", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%ld", MainWindowPlacement.rcNormalPosition.right);
-    WritePrivateProfileString(Section, L"right", csString, (LPCTSTR)strAppNameINI);
-    csString.Format(L"%ld", MainWindowPlacement.rcNormalPosition.top);
-    WritePrivateProfileString(Section, L"top", csString, (LPCTSTR)strAppNameINI);
-}
-
-//****************************************************************
-//
-// Restores the position of a window
-//
-//****************************************************************
-BOOL RestoreWindowPlacement(HWND hWnd, CString& Section)
-{
-    WCHAR szString[MAX_PATH + 1];
-    DWORD dRes;
-    int iRes;
-
-    // save window size and location for next time
-    WINDOWPLACEMENT MainWindowPlacement;
-
-    dRes = GetPrivateProfileString(Section, L"showCmd",L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%u", &MainWindowPlacement.showCmd);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"flags", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%u", &MainWindowPlacement.flags);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"ptMaxPosition.x", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%ld", &MainWindowPlacement.ptMaxPosition.x);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"ptMaxPosition.y", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%ld", &MainWindowPlacement.ptMaxPosition.y);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"ptMinPosition.x", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%ld", &MainWindowPlacement.ptMinPosition.x);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"ptMinPosition.y", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%ld", &MainWindowPlacement.ptMinPosition.y);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"bottom", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%ld", &MainWindowPlacement.rcNormalPosition.bottom);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"left", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%ld", &MainWindowPlacement.rcNormalPosition.left);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"right", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%ld", &MainWindowPlacement.rcNormalPosition.right);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    
-    dRes = GetPrivateProfileString(Section, L"top", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
-    if (dRes == 0)
-    {
-        return FALSE;
-    }
-    else
-    {
-        iRes = swscanf_s(szString, L"%ld", &MainWindowPlacement.rcNormalPosition.top);
-        if (iRes == 0) {
-            return FALSE;
-        }
-    }
-    MainWindowPlacement.length = sizeof(WINDOWPLACEMENT);
-    if (!SetWindowPlacement(hWnd, &MainWindowPlacement))
-    {
-        LastErrorMsg(L"SetWindowPlacement");
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-//****************************************************************
-//
-// This displays the last system error message
-// 
-//  This is from Microsoft:
-//  https://docs.microsoft.com/en-us/windows/win32/debug/retrieving-the-last-error-code
-//
-//****************************************************************
-void LastErrorMsg(LPCTSTR lpszFunction)
-{
-    // Retrieve the system error message for the last-error code
-
-    LPVOID lpMsgBuf;
-    LPVOID lpDisplayBuf;
-    DWORD dw = GetLastError();
-
-    FormatMessage(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER |
-        FORMAT_MESSAGE_FROM_SYSTEM |
-        FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL,
-        dw,
-        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPTSTR)&lpMsgBuf,
-        0, NULL);
-
-    // Display the error message and exit the process
-
-    lpDisplayBuf = (LPVOID)LocalAlloc(LMEM_ZEROINIT,
-        (lstrlen((LPCTSTR)lpMsgBuf) + lstrlen((LPCTSTR)lpszFunction) + 40) * sizeof(TCHAR));
-
-StringCchPrintf((LPTSTR)lpDisplayBuf,
-    LocalSize(lpDisplayBuf) / sizeof(TCHAR),
-    TEXT("%s failed with error %d: %s"),
-    lpszFunction, dw, lpMsgBuf);
-
-MessageBox(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK);
-
-LocalFree(lpMsgBuf);
-LocalFree(lpDisplayBuf);
-ExitProcess(dw);
-}
-
-//****************************************************************
-//
-// This function was originally posted on stack overflow:
-// https://stackoverflow.com/questions/316626/how-do-i-read-from-a-version-resource-in-visual-c, Mark Ransom
-//  It has beedn changed to also include readback of the copyright, name and exectuable filename
-//  Corrected SetString parameter cast from (LPCSTR) to (LPCTSTR) to allow generic use of CString type rather than only CStringA
-//
-//  This function retrieves the Product Name, Program Version, Name (typically license information), and CopyRight from the version
-//  structure in this application.  It also reports the full application EXE filename plus full path to the EXE.
-//  Application exe name from the version structure in this application.  It is typically reported in the About Dlg
-// 
-//****************************************************************
-BOOL GetProductAndVersion(CString* strProductName, CString* strProductVersion,
-    CString* strName, CString* strCopyright, CString* strAppNameEXE)
-{
-
-    // get the filename of the executable containing the version resource
-    TCHAR szFilename[MAX_PATH + 1] = { 0 };
-    if (GetModuleFileName(NULL, szFilename, MAX_PATH) == 0)
-    {
-        //MessageBox("GetModuleFileName failed with error %d\n", GetLastError());
-        return false;
-    }
-
-    // allocate a block of memory for the version info
-    DWORD dummy;
-    DWORD dwSize = GetFileVersionInfoSize(szFilename, &dummy);
-    if (dwSize == 0)
-    {
-        //TRACE("GetFileVersionInfoSize failed with error %d\n", GetLastError());
-        return false;
-    }
-    std::vector<BYTE> data(dwSize);
-
-    // load the version info
-    if (!GetFileVersionInfo(szFilename, NULL, dwSize, &data[0]))
-    {
-        //TRACE("GetFileVersionInfo failed with error %d\n", GetLastError());
-        return false;
-    }
-
-    // get the name and version strings
-    LPVOID pvProductName = NULL;
-    unsigned int iProductNameLen = 0;
-    LPVOID pvProductVersion = NULL;
-    unsigned int iProductVersionLen = 0;
-    LPVOID pvCopyright = NULL;
-    unsigned int iCopyrightLen = 0;
-    LPVOID pvName = NULL;
-    unsigned int iNameLen = 0;
-
-    // replace "040904b0" with the language ID of your resources, Block Header ID English US is 040904b0
-    if (!VerQueryValue(&data[0], _T("\\StringFileInfo\\040904b0\\ProductName"), &pvProductName, &iProductNameLen) ||
-        !VerQueryValue(&data[0], _T("\\StringFileInfo\\040904b0\\ProductVersion"), &pvProductVersion, &iProductVersionLen) ||
-        !VerQueryValue(&data[0], _T("\\StringFileInfo\\040904b0\\LegalCopyright"), &pvCopyright, &iCopyrightLen) ||
-        !VerQueryValue(&data[0], _T("\\StringFileInfo\\040904b0\\CompanyName"), &pvName, &iNameLen))
-    {
-        //TRACE("Can't obtain ProductName, ProductVersion, Copyright or Name from resources\n");
-        return false;
-    }
-
-    // Copy results to function parameters
-    strProductName->SetString((LPCTSTR)pvProductName, iProductNameLen);
-    strProductVersion->SetString((LPCTSTR)pvProductVersion, iProductVersionLen);
-    strName->SetString((LPCTSTR)pvName, iNameLen);
-    strCopyright->SetString((LPCTSTR)pvCopyright, iCopyrightLen);
-    strAppNameEXE->SetString(szFilename);
-
-    return true;
-}
-
-//****************************************************************
-//
 //  This function displays a BMP or image file in 
 //  the image display window.
 //
@@ -730,15 +435,12 @@ int DisplayImage(WCHAR* Filename)
         if (iRes !=1) {
             return (int) iRes;
         }
-        // trigger redraw
-        if (!IsWindow(hwndImage)) {
-            hwndImage = CreateDialog(hInst, MAKEINTRESOURCE(IDD_IMAGE), hwndMain, ImageDlg);
-        }
         if (hwndImage != NULL) {
-            PostMessage(hwndImage, WM_COMMAND, IDC_GENERATE_BMP, 0l);
+            SendMessage(hwndImage, WM_COMMAND, IDC_GENERATE_BMP, 0l);
             ShowWindow(hwndImage, SW_SHOW);
+            // todo:
         }
-        return 1;
+        return APP_SUCCESS;
     }
 
     // This should be a BMP file
@@ -750,32 +452,29 @@ int DisplayImage(WCHAR* Filename)
 
     ErrNum = _wfopen_s(&In, Filename, L"rb");
     if (In == NULL) {
-        return -2;
+        return APPERR_FILEOPEN;
     }
     iRes = fread(&BMPheader, sizeof(BMPheader), 1, In);
-    if (iRes != 1) {
+    if (iRes != APP_SUCCESS) {
         fclose(In);
-        return -4;
+        return APPERR_FILETYPE;
     }
     if (BMPheader.bfType != 0x4d42 || BMPheader.bfReserved1 != 0 || BMPheader.bfReserved2 != 0) {
         fclose(In);
-        return -4;
+        return APPERR_FILETYPE;
     }
     fclose(In);
 
     // copy filename to szBMPFilename
     if (!CopyFile(Filename, szBMPFilename, FALSE)) {
-        return -3;
+        return APPERR_FILEREAD;
     }
-    // trigger redraw
-    if (!IsWindow(hwndImage)) {
-        hwndImage = CreateDialog(hInst, MAKEINTRESOURCE(IDD_IMAGE), hwndMain, ImageDlg);
-    }
+
     if (hwndImage != NULL) {
-        PostMessage(hwndImage, WM_COMMAND, IDC_GENERATE_BMP, 0l);
+        SendMessage(hwndImage, WM_COMMAND, IDC_GENERATE_BMP, 0l);
         ShowWindow(hwndImage, SW_SHOW);
     }
-    return 1;
+    return APP_SUCCESS;
 }
 
 //****************************************************************
@@ -986,16 +685,16 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
     BYTE* BMPimage;
 
     iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-    if (iRes != 1) {
+    if (iRes != APP_SUCCESS) {
         return iRes;
     }
 
     if (ImageHeader.PixelSize > 2) {
-        return 0;
+        return APPERR_PARAMETER;
     }
 
     if (ImageHeader.Xsize > 8192) {
-        return 0;
+        return APPERR_PARAMETER;
     }
 
     if (RGBframes && ImageHeader.NumFrames%3!=0) {
@@ -1129,7 +828,7 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
         BMPimage = (BYTE*)calloc(BMPimageBytes, 1);
         if (BMPimage == NULL) {
             delete[] InputImage;
-            return -1;
+            return APPERR_MEMALLOC;
         }
 
         int BMPOffset;
@@ -1262,7 +961,7 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
         BMPimage = (BYTE*) calloc(BMPimageBytes, 1);
         if (BMPimage == NULL) {
             delete[] InputImage;
-            return -1;
+            return APPERR_MEMALLOC;
         }
 
         int InputOffset;
@@ -1356,7 +1055,7 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
     ErrNum = _wfopen_s(&Out, Filename, L"wb");
     if (Out == NULL) {
         free(BMPimage);
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     // write the BMPheader
@@ -1383,11 +1082,11 @@ int SaveBMP(WCHAR* Filename, WCHAR* InputFile,int RGBframes, int AutoScale)
 
     if (AutoPNG) {
         if (SaveBMP2PNG(Filename) != 1) {
-            return 0;
+            return APPERR_PARAMETER;
         }
     }
 
-    return 1;
+    return APP_SUCCESS;
 }
 
 //****************************************************************
@@ -1423,7 +1122,7 @@ int SaveTXT(WCHAR* Filename, WCHAR* InputFile)
 IMAGINGHEADER ImageHeader;
 
 iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-if (iRes != 1) {
+if (iRes != APP_SUCCESS) {
     return iRes;
 }
 
@@ -1434,7 +1133,7 @@ int Address;
 ErrNum = _wfopen_s(&Out, Filename, L"w");
 if (Out == NULL) {
     delete[] InputImage;
-    return -2;
+    return APPERR_FILEOPEN;
 }
 
 // save file in text format, blank line between frames
@@ -1469,7 +1168,7 @@ for (int Frame = 0; Frame < ImageHeader.NumFrames; Frame++) {
 fclose(Out);
 delete[] InputImage;
 
-return 1;
+return APP_SUCCESS;
 }
 
 //****************************************************************
@@ -1477,7 +1176,7 @@ return 1;
 //  ImportBMP
 // 
 //****************************************************************
-int ImportBMP(HWND hWnd)
+int  ImportBMP(HWND hWnd)
 {
     WCHAR InputFilename[MAX_PATH];
     WCHAR OutputFilename[MAX_PATH];
@@ -1499,13 +1198,13 @@ int ImportBMP(HWND hWnd)
     };
 
     if (!CCFileOpen(hWnd, InputFilename, &pszFilename, FALSE, 2, BMPType, L".bmp")) {
-        return 1;
+        return APP_SUCCESS;
     }
     wcscpy_s(InputFilename, pszFilename);
     CoTaskMemFree(pszFilename);
 
     if (!CCFileSave(hWnd, OutputFilename, &pszFilename, FALSE, 2, IMGType, L".bmp")) {
-        return 1;
+        return APP_SUCCESS;
     }
     wcscpy_s(OutputFilename, pszFilename);
     CoTaskMemFree(pszFilename);
@@ -1525,7 +1224,7 @@ int ImportBMP(HWND hWnd)
 
     ErrNum = _wfopen_s(&BMPfile, InputFilename, L"rb");
     if (!BMPfile) {
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     // read BMP headers
@@ -1536,39 +1235,39 @@ int ImportBMP(HWND hWnd)
     BYTE* Stride;
 
     iRes = (int)fread(&BMPheader, sizeof(BITMAPFILEHEADER), 1, BMPfile);
-    if (iRes != 1) {
+    if (iRes != APP_SUCCESS) {
         fclose(BMPfile);
-        return -4;
+        return APPERR_FILETYPE;
     }
 
     iRes = (int)fread(&BMPinfoheader, sizeof(BITMAPINFOHEADER), 1, BMPfile);
-    if (iRes != 1) {
+    if (iRes != APP_SUCCESS) {
         fclose(BMPfile);
-        return -4;
+        return APPERR_FILETYPE;
     }
 
     // verify this type of file can be imported
     if (BMPheader.bfType != 0x4d42 || BMPheader.bfReserved1 != 0 || BMPheader.bfReserved2 != 0) {
         // this is not a BMP file
         fclose(BMPfile);
-        return -4;
+        return APPERR_FILETYPE;
     }
     if (BMPinfoheader.biSize != sizeof(BITMAPINFOHEADER)) {
         // this is not a BMP file
         fclose(BMPfile);
-        return -4;
+        return APPERR_FILETYPE;
     }
 
     if (BMPinfoheader.biCompression != BI_RGB) {
         // this is wrong type of BMP file
         fclose(BMPfile);
-        return 0;
+        return APPERR_PARAMETER;
     }
     if (BMPinfoheader.biBitCount != 1 && BMPinfoheader.biBitCount != 8 && 
          BMPinfoheader.biBitCount != 24 && BMPinfoheader.biPlanes!=1) {
         // this is wrong type of BMP file
         fclose(BMPfile);
-        return 0;
+        return APPERR_PARAMETER;
     }
 
     // read in image
@@ -1588,7 +1287,7 @@ int ImportBMP(HWND hWnd)
     Stride = new BYTE[(size_t)StrideLen];
     if (Stride == NULL) {
         fclose(BMPfile);
-        return -1;
+        return APPERR_MEMALLOC;
     }
 
     int NumFrames = 1;
@@ -1599,7 +1298,7 @@ int ImportBMP(HWND hWnd)
         if (fseek(BMPfile, sizeof(RGBQUAD) * 2, SEEK_CUR) != 0) {
             delete[] Stride;
             fclose(BMPfile);
-            return -4;
+            return APPERR_FILETYPE;
         }
         int BitCount;
         int StrideIndex;
@@ -1611,7 +1310,7 @@ int ImportBMP(HWND hWnd)
         if (Image == NULL) {
             delete[] Stride;
             fclose(BMPfile);
-            return -1;
+            return APPERR_MEMALLOC;
         }
 
         // BMPimage of BMPimageBytes
@@ -1622,7 +1321,7 @@ int ImportBMP(HWND hWnd)
                 delete[] Image;
                 delete[] Stride;
                 fclose(BMPfile);
-                return -4;
+                return APPERR_FILETYPE;
             }
             BitCount = 0;
             StrideIndex = 0;
@@ -1665,7 +1364,7 @@ int ImportBMP(HWND hWnd)
         if (fseek(BMPfile, sizeof(RGBQUAD) * 256, SEEK_CUR) != 0) {
             delete[] Stride;
             fclose(BMPfile);
-            return -4;
+            return APPERR_FILETYPE;
         }
 
         // allocate Image
@@ -1674,7 +1373,7 @@ int ImportBMP(HWND hWnd)
         if (Image == NULL) {
             delete[] Stride;
             fclose(BMPfile);
-            return -1;
+            return APPERR_MEMALLOC;
         }
 
         // BMPimage of BMPimageBytes
@@ -1687,7 +1386,7 @@ int ImportBMP(HWND hWnd)
                 delete[] Image;
                 delete[] Stride;
                 fclose(BMPfile);
-                return -4;
+                return APPERR_FILETYPE;
             }
             if (TopDown) {
                 Offset = ((BMPinfoheader.biHeight - 1) - y) * BMPinfoheader.biWidth;
@@ -1710,7 +1409,7 @@ int ImportBMP(HWND hWnd)
             if (fseek(BMPfile, sizeof(RGBQUAD) * BMPinfoheader.biClrUsed, SEEK_CUR) != 0) {
                 delete[] Stride;
                 fclose(BMPfile);
-                return -4;
+                return APPERR_FILETYPE;
             }
         }
         
@@ -1718,7 +1417,7 @@ int ImportBMP(HWND hWnd)
         if (Image == NULL) {
             delete[] Stride;
             fclose(BMPfile);
-            return -1;
+            return APPERR_MEMALLOC;
         }
 
         // BMPimage of BMPimageBytes
@@ -1734,7 +1433,7 @@ int ImportBMP(HWND hWnd)
                 delete[] Image;
                 delete[] Stride;
                 fclose(BMPfile);
-                return -4;
+                return APPERR_FILETYPE;
             }
             if (TopDown) {
                 Offset = ((BMPinfoheader.biHeight - 1) - y) * BMPinfoheader.biWidth;
@@ -1775,7 +1474,7 @@ int ImportBMP(HWND hWnd)
     ErrNum = _wfopen_s(&ImgFile, OutputFilename, L"wb");
     if (ImgFile==NULL) {
         delete[] Image;
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     BYTE Pixel;
@@ -1802,7 +1501,7 @@ int ImportBMP(HWND hWnd)
         DisplayImage(OutputFilename);
     }
 
-    return 1;
+    return APP_SUCCESS;
 }
 
 //****************************************************************
@@ -1833,13 +1532,13 @@ int HEX2Binary(HWND hWnd)
     };
 
     if (!CCFileOpen(hWnd, InputFilename, &pszFilename, FALSE, 2, txtType, L".bmp")) {
-        return 1;
+        return APP_SUCCESS;
     }
     wcscpy_s(InputFilename, pszFilename);
     CoTaskMemFree(pszFilename);
 
     if (!CCFileSave(hWnd, OutputFilename, &pszFilename, FALSE, 3, AllType, L"")) {
-        return 1;
+        return APP_SUCCESS;
     }
     wcscpy_s(OutputFilename, pszFilename);
     CoTaskMemFree(pszFilename);
@@ -1856,17 +1555,17 @@ int HEX2Binary(HWND hWnd)
 
     ErrNum = _wfopen_s(&Input, InputFilename, L"rb");
     if (Input ==NULL) {
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     ErrNum = _wfopen_s(&Output, OutputFilename, L"wb");
     if (Output == NULL) {
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     while (!feof(Input)) {
         iRes = fscanf_s(Input, "%2x", &HexRead);
-        if (iRes != 1) {
+        if (iRes != APP_SUCCESS) {
             break;
         }
         HexValue = (BYTE)HexRead;
@@ -1876,7 +1575,7 @@ int HEX2Binary(HWND hWnd)
     fclose(Output);
     fclose(Input);
 
-    return 1;
+    return APP_SUCCESS;
 }
 
 //****************************************************************
@@ -1922,13 +1621,13 @@ int CamIRaImport(HWND hWnd)
     };
 
     if (!CCFileOpen(hWnd, InputFilename, &pszFilename, FALSE, 2, txtType, L".img")) {
-        return 1;
+        return APP_SUCCESS;
     }
     wcscpy_s(InputFilename, pszFilename);
     CoTaskMemFree(pszFilename);
 
     if (!CCFileSave(hWnd, OutputFilename, &pszFilename, FALSE, 2, AllType, L".raw")) {
-        return 1;
+        return APP_SUCCESS;
     }
     wcscpy_s(OutputFilename, pszFilename);
     CoTaskMemFree(pszFilename);
@@ -1942,21 +1641,21 @@ int CamIRaImport(HWND hWnd)
 
     ErrNum = _wfopen_s(&Input, InputFilename, L"rb");
     if (Input == NULL) {
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     int iRes;
     int HeaderLen;
     HeaderLen = sizeof(CamIRaHeader);
-    iRes = fread(&CamIRaHeader, HeaderLen, 1, Input);
-    if (iRes != 1) {
+    iRes = (int) fread(&CamIRaHeader, HeaderLen, 1, Input);
+    if (iRes != APP_SUCCESS) {
         fclose(Input);
-        return -4;
+        return APPERR_FILETYPE;
     }
 
     if (CamIRaHeader.FirstWord != -1 && CamIRaHeader.PixelSize!=1 && CamIRaHeader.PixelSize!=2) {
         fclose(Input);
-        return -4;
+        return APPERR_FILETYPE;
     }
     
     int NumFrames;
@@ -1968,7 +1667,7 @@ int CamIRaImport(HWND hWnd)
     }
     if (NumFrames > 32767 || CamIRaHeader.PixelSize > 2) {
         fclose(Input);
-        return -4;
+        return APPERR_FILETYPE;
     }
 
     // create ImageHeader
@@ -1993,7 +1692,7 @@ int CamIRaImport(HWND hWnd)
     ErrNum = _wfopen_s(&Output, OutputFilename, L"wb");
     if (Output == NULL) {
         fclose(Input);
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     // write ImageHeader
@@ -2005,21 +1704,21 @@ int CamIRaImport(HWND hWnd)
             for (int x = 0; x < ImgHeader.Xsize; x++) {
                 if (ImgHeader.PixelSize == 1) {
                     BYTE Pixel;
-                    iRes = fread(&Pixel, 1, 1, Input);
-                    if (iRes != 1) {
+                    iRes = (int) fread(&Pixel, 1, 1, Input);
+                    if (iRes != APP_SUCCESS) {
                         fclose(Input);
                         fclose(Output);
-                        return -4;
+                        return APPERR_FILETYPE;
                     }
                     fwrite(&Pixel, 1, 1, Output);
                 }
                 else {
                     short Pixel;
-                    iRes = fread(&Pixel, 2, 1, Input);
-                    if (iRes != 1) {
+                    iRes = (int) fread(&Pixel, 2, 1, Input);
+                    if (iRes != APP_SUCCESS) {
                         fclose(Input);
                         fclose(Output);
-                        return -4;
+                        return APPERR_FILETYPE;
                     }
                     fwrite(&Pixel, 2, 1, Output);
                 }
@@ -2029,7 +1728,7 @@ int CamIRaImport(HWND hWnd)
     wcscpy_s(szCurrentFilename, OutputFilename);
     fclose(Output);
     fclose(Input);
-    return 1;
+    return APP_SUCCESS;
 }
 
 //****************************************************************
@@ -2047,12 +1746,12 @@ int GetFileSize(WCHAR* szString)
 
     ErrNum = _wfopen_s(&In, szString, L"rb");
     if (In == NULL) {
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     while (!feof(In)) {
-        iRes = fread(&Junk, 1, 1, In);
-        if (iRes != 1) {
+        iRes = (int) fread(&Junk, 1, 1, In);
+        if (iRes != APP_SUCCESS) {
             break;
         }
         FileSize++;
@@ -2142,12 +1841,12 @@ int SaveBMP2PNG(WCHAR* Filename)
         err = _wsplitpath_s(Filename, Drive, _MAX_DRIVE, Dir, _MAX_DIR, Fname,
             _MAX_FNAME, Ext, _MAX_EXT);
         if (err != 0) {
-            return 0;
+            return APPERR_PARAMETER;
         }
 
         err = _wmakepath_s(PNGfilename, _MAX_PATH, Drive, Dir, Fname, L".png");
         if (err != 0) {
-            return 0;
+            return APPERR_PARAMETER;
         }
 
         stat = image->Save(PNGfilename, &encoderClsid, NULL);
@@ -2156,8 +1855,8 @@ int SaveBMP2PNG(WCHAR* Filename)
     Gdiplus::GdiplusShutdown(gdiplusToken);
 
     if (stat == Gdiplus::Ok) {
-        return 1;
+        return APP_SUCCESS;
     }
 
-    return 0;
+    return APPERR_PARAMETER;
 }

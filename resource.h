@@ -54,6 +54,7 @@
 #define IDD_IMGTOOLS_REORDER_BLOCKS     170
 #define IDD_PROPERTIES_FINDAPRIME       171
 #define IDD_IMGTOOLS_EXTRACTBATCH       172
+#define ID_IMG_STATUSBAR                200
 #define IDC_APID                        1060
 #define IDC_HEADER2SIZE                 1061
 #define IDC_TEXT_OUTPUT2                1062
@@ -98,6 +99,7 @@
 #define IDC_XSIZE3                      1114
 #define IDC_PIXEL_SIZE                  1115
 #define IDC_REPORT                      1116
+#define IDC_SETTINGS_STATUSBAR          1116
 #define IDC_YSIZEI2                     1117
 #define IDC_P1                          1118
 #define IDC_APPEND                      1119
@@ -248,6 +250,9 @@
 #define IDM_PROPERTIES_FINDAPRIME       32907
 #define IDM_IMGTOOLS_BATCHEXTRACT       32911
 #define IDM_IMGTOOLS_EXTRACTBATCH       32912
+#define IDM_RESET_WINDOW_POSITIONS      32914
+#define IDM_RESET_ZOOM                  32917
+#define IDM__RESET_PANXY                32918
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -256,7 +261,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        200
-#define _APS_NEXT_COMMAND_VALUE         32913
+#define _APS_NEXT_COMMAND_VALUE         32919
 #define _APS_NEXT_CONTROL_VALUE         1305
 #define _APS_NEXT_SYMED_VALUE           300
 #endif

@@ -3,12 +3,11 @@
 // function prototypes
 //
 BOOL CCFileSave(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
-BOOL bSelectFolder, int NumTypes, COMDLG_FILTERSPEC* FileTypes, LPCWSTR szDefExt);
+				BOOL bSelectFolder, int NumTypes, COMDLG_FILTERSPEC* FileTypes,
+				LPCWSTR szDefExt);
 BOOL CCFileOpen(HWND hWnd, LPWSTR pszCurrentFilename, LPWSTR* pszFilename,
-BOOL bSelectFolder, int NumTypes, COMDLG_FILTERSPEC* FileTypes, LPCWSTR szDefExt);
-void SaveWindowPlacement(HWND hWnd, CString& Section);
-BOOL RestoreWindowPlacement(HWND hWnd, CString& Section);
-void LastErrorMsg(LPCTSTR lpszFunction);
+				BOOL bSelectFolder, int NumTypes, COMDLG_FILTERSPEC* FileTypes,
+				LPCWSTR szDefExt);
 void ExportFile(HWND hWnd, int wmId);
 int SaveBMP(WCHAR* Filename, WCHAR* InputFile, int RGBframes, int AutoScale);
 int SaveTXT(WCHAR* Filename, WCHAR* InputFile);
@@ -19,9 +18,3 @@ int CamIRaImport(HWND hWnd);
 int GetFileSize(WCHAR* szString);
 int SaveBMP2PNG(WCHAR* Filename);
 
-BOOL GetProductAndVersion(CString* strProductName,
-    CString* strProductVersion,
-    CString* strName,
-    CString* strCopyright,
-    CString* strAppNameEXE
-);

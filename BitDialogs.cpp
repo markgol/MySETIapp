@@ -40,6 +40,7 @@
 //                      Changed, Bistream to image file, Changed dialog to clarify which
 //                        bit order flag applies to input file and which applies ot output file.
 //                      Changed, Bit Reorder dialog, added invert reorder transform
+// V1.3.1.1 2023-12-28  Replaced application error numbers with #define to improve clarity
 // 
 // Bit tools dialog box handlers
 // 
@@ -59,10 +60,14 @@
 #include <vector>
 #include <atlstr.h>
 #include <strsafe.h>
+#include "AppErrors.h"
+#include "ImageDialog.h"
 #include "Globals.h"
+#include "AppFunctions.h"
+#include "imaging.h"
 #include "FileFunctions.h"
 #include "BitStream.h"
-#include "imaging.h"
+
 
 // Add new callback prototype declarations in my MySETIapp.cpp
 
@@ -1575,7 +1580,8 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             int BitOrder = 0;
             int BitScale = 0;
             int Invert = 0;
-            int InputBitOrder;
+            int InputBitOrder = 0;
+			int iRes;
 
             GetDlgItemText(hDlg, IDC_BINARY_INPUT, InputFile, MAX_PATH);
             GetDlgItemText(hDlg, IDC_IMAGE_OUTPUT, OutputFile, MAX_PATH);
@@ -1610,7 +1616,7 @@ INT_PTR CALLBACK BitImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
             }
 
             if (xsize >= xsizeEnd) {
-                BitStream2Image(hDlg, InputFile, OutputFile,
+                iRes = BitStream2Image(hDlg, InputFile, OutputFile,
                     PrologueSize, BlockHeaderBits, NumBlockBodyBits, BlockNum, xsize,
                     BitDepth, BitOrder, BitScale, Invert, InputBitOrder);
 
@@ -1782,8 +1788,11 @@ INT_PTR CALLBACK Text2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
                 BitOrder = 1;
             }
 
-            ConvertText2BitStream(hDlg, InputFile, OutputFile,BitOrder);
-
+            int iRes = ConvertText2BitStream(hDlg, InputFile, OutputFile,BitOrder);
+			if (iRes != APP_SUCCESS) {
+                MessageMySETIappError(hDlg, iRes, L"Convert");
+                return (INT_PTR)TRUE;
+            }
             return (INT_PTR)TRUE;
         }
 

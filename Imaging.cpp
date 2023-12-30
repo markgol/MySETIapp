@@ -70,12 +70,16 @@
 // V1.2.11.1 2023-11-7	Added, ComputeBlockReordering and BlockReorder
 // V1.2.12.1 2023-11-15	Changed, Resize image, Added 0 settings to indicate to use original setting
 //						Correction, Extract image, fixed error when extracting multiple frames
+// V1.3.1.1 2023-12-28  Replaced application error numbers with #define to improve clarity
+//						Changed all batch processing to allow display of results from each step
 //
 #include "framework.h"
-#include "stdio.h"
-#include "wchar.h"
+#include <stdio.h>
+#include <wchar.h>
 #include <atlstr.h>
-#include "strsafe.h"
+#include <strsafe.h>
+#include "AppErrors.h"
+#include "ImageDialog.h"
 #include "Globals.h"
 #include "Imaging.h"
 #include "FileFunctions.h"
@@ -110,7 +114,7 @@
 //		int iRes;
 //		IMAGINGHEADER InputHeader;
 //		iRes = LoadImageFile(&Image1, ImageInputFile, &InputHeader);
-//		if (iRes != 1) {
+//		if (iRes != APP_SUCCESS) {
 //			MessageBox(hDlg, L"Input file read error", L"File I/O error", MB_OK);
 //			return iRes;
 //		}
@@ -127,33 +131,33 @@ int LoadImageFile(int** ImagePtr, WCHAR* ImagingFilename, IMAGINGHEADER* Header)
 	_wfopen_s(&In, ImagingFilename, L"rb");
 	if (In == NULL) {
 		*ImagePtr = NULL;
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	iRead = fread(Header, sizeof(IMAGINGHEADER), 1, In);
 	if (iRead != 1) {
 		*ImagePtr = NULL;
 		fclose(In);
-		return -3;
+		return APPERR_FILEREAD;
 	}
 
 
 	if (Header->Endian != 0 && Header->Endian != -1 && Header->ID != 0xaaaa) {
 		*ImagePtr = NULL;
 		fclose(In);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (Header->Xsize <= 0 || Header->Ysize <= 0 || Header->NumFrames <= 0) {
 		*ImagePtr = NULL;
 		fclose(In);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (Header->PixelSize != 1 && Header->PixelSize != 2 && Header->PixelSize != 4) {
 		*ImagePtr = NULL;
 		fclose(In);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int* Image;
@@ -172,7 +176,7 @@ int LoadImageFile(int** ImagePtr, WCHAR* ImagingFilename, IMAGINGHEADER* Header)
 	if (Image == NULL) {
 		*ImagePtr = NULL;
 		fclose(In);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	*ImagePtr = Image;
@@ -186,7 +190,7 @@ int LoadImageFile(int** ImagePtr, WCHAR* ImagingFilename, IMAGINGHEADER* Header)
 			fclose(In);
 			delete[] Image;
 			*ImagePtr = NULL;
-			return -3;
+			return APPERR_FILEREAD;
 		}
 
 		if (PixelSize == 1) {
@@ -217,7 +221,7 @@ int LoadImageFile(int** ImagePtr, WCHAR* ImagingFilename, IMAGINGHEADER* Header)
 	fclose(In);
 	// calling routine is responsible for deleting 'Image' memory
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //*****************************************************************************************
@@ -298,7 +302,7 @@ void ReportImageProperties(HWND hDlg, WCHAR* Filename)
 	int iRes;
 
 	iRes = LoadImageFile(&InputImage, Filename, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		if (iRes == -2) {
 			//     -2 open file failure
 			MessageBox(hDlg, L"Could not open file", L"File error", MB_OK);
@@ -380,32 +384,32 @@ int ReadImageHeader(WCHAR* Filename, IMAGINGHEADER* ImageHeader)
 
 	ErrNum = _wfopen_s(&In, Filename, L"rb");
 	if (In == NULL) {
-		return -1;
+		return APPERR_FILEOPEN;
 	}
 
 	iRead = fread(ImageHeader, sizeof(IMAGINGHEADER), 1, In);
 	if (iRead != 1) {
-		return -2;
+		return APPERR_FILEREAD;
 	}
 	fclose(In);
 
 	if (ImageHeader->Endian != 0 && ImageHeader->Endian != -1) {
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (ImageHeader->ID != (short)0xaaaa) {
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (ImageHeader->HeaderSize != sizeof(IMAGINGHEADER)) {
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (ImageHeader->PixelSize != 1 && ImageHeader->PixelSize != 2 && ImageHeader->PixelSize != 4) {
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -475,15 +479,15 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 
 	if (SubimageXsize > OutputXsize) {
 		MessageBox(hDlg, L"Sub Image x size is larger than output image x size", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 	if (SubimageYsize > OutputYsize) {
 		MessageBox(hDlg, L"Sub Image y size is larger than output image y size", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	iRes = ReadImageHeader(InputImageFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Input file is not pixel image file", L"File I/O", MB_OK);
 		return iRes;
 	}
@@ -493,7 +497,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 			EndFrame >= InputHeader.NumFrames)
 		{
 			MessageBox(hDlg, L"Start Frame or EndFrame invalid", L"File I/O", MB_OK);
-			return 0;
+			return APPERR_PARAMETER;
 		}
 		CopyFrames = (EndFrame - StartFrame) + 1;
 	}
@@ -503,18 +507,18 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	}
 	if (SubimageXsize > InputHeader.Xsize) {
 		MessageBox(hDlg, L"Sub Image x size is larger than input image x size", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 	if (SubimageYsize > InputHeader.Ysize) {
 		MessageBox(hDlg, L"Sub Image y size is larger than input image y size", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	// read image
 	ErrNum = _wfopen_s(&In, InputImageFile, L"rb");
 	if (In == NULL) {
 		MessageBox(hDlg, L"Could not open image input file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	InputFrameSize = InputHeader.Xsize * InputHeader.Ysize;
@@ -524,7 +528,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	if (Image == NULL) {
 		fclose(In);
 		MessageBox(hDlg, L"Input Image alloc failure", L"File I/O", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 	// initially skip frames that are not required
 	if (StartFrame != 0) {
@@ -537,7 +541,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 		free(Image);
 		fclose(In);
 		MessageBox(hDlg, L"bad format, Image file, too small", L"File I/O", MB_OK);
-		return -3;
+		return APPERR_FILEREAD;
 	}
 
 	// read rest of requested frames
@@ -547,7 +551,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 			free(Image);
 			fclose(In);
 			MessageBox(hDlg, L"bad format, Image file, too small", L"File I/O", MB_OK);
-			return -3;
+			return APPERR_FILEREAD;
 		}
 		if (InputHeader.PixelSize == 1) {
 			Image[i] = (int)Pixel.Byte[0];
@@ -569,7 +573,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 	if (SubImage == NULL) {
 		free(Image);
 		MessageBox(hDlg, L"Sub Image alloc failure", L"File I/O", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	// extract sub image from input image
@@ -634,7 +638,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 		free(Image);
 		free(SubImage);
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	// write out upated header for output file
@@ -684,7 +688,7 @@ int ImageExtract(HWND hDlg, WCHAR* InputImageFile, WCHAR* OutputImageFile,
 		DisplayImage(OutputImageFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -723,29 +727,29 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 	int iRes;
 
 	iRes = ReadImageHeader(ImageInputFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"First image file is not valid", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
 	iRes = ReadImageHeader(ImageInputFile2, &InputHeader2);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Image file to append is not valid", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
 	if (InputHeader.Xsize != InputHeader2.Xsize) {
 		MessageBox(hDlg, L"Input files need to have the same x size", L"Incompatible file type", MB_OK);
-		return -5;
+		return APPERR_FILESIZE;
 	}
 
 	if (IncrFrames && InputHeader.Ysize != InputHeader2.Ysize) {
 		MessageBox(hDlg, L"Input files need to have the same y size", L"Incompatible file type", MB_OK);
-		return -5;
+		return APPERR_FILESIZE;
 	}
 
 	if (!IncrFrames && InputHeader.NumFrames != InputHeader2.NumFrames) {
 		MessageBox(hDlg, L"per frame append (ySize*2) requires both files to have same # of frames",
 			L"Incompatible file type", MB_OK);
-		return -5;
+		return APPERR_FILESIZE;
 	}
 	
 	memcpy_s(&OutputHeader, sizeof(OutputHeader), &InputHeader, sizeof(InputHeader));
@@ -770,12 +774,12 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 	int* Image2;
 
 	iRes = LoadImageFile(&Image1, ImageInputFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Input file read error", L"File I/O error", MB_OK);
 		return iRes;
 	}
 	iRes = LoadImageFile(&Image2, ImageInputFile2, &InputHeader2);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		delete[] Image1;
 		MessageBox(hDlg, L"Input fileto append read error", L"File I/O error", MB_OK);
 		return iRes;
@@ -791,7 +795,7 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 		delete[] Image1;
 		delete[] Image2;
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 	// save new imahe header
 	fwrite(&OutputHeader, sizeof(OutputHeader), 1, Out);
@@ -830,7 +834,7 @@ int ImageAppendEnd(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCH
 		DisplayImage(ImageOutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -865,24 +869,24 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 	int iRes;
 
 	iRes = ReadImageHeader(ImageInputFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"First image file is not valid", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
 	iRes = ReadImageHeader(ImageInputFile2, &InputHeader2);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Image file to append is not valid", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
 	if (InputHeader.Ysize != InputHeader2.Ysize) {
 		MessageBox(hDlg, L"Input files are not the row size", L"Incompatible file type", MB_OK);
-		return -5;
+		return APPERR_FILESIZE;
 	}
 
 	if (InputHeader.NumFrames != InputHeader2.NumFrames) {
 		MessageBox(hDlg, L"Append right requires both files to have same # of frames",
 			L"Incompatible file type", MB_OK);
-		return -5;
+		return APPERR_FILESIZE;
 	}
 
 	memcpy_s(&OutputHeader, sizeof(OutputHeader), &InputHeader, sizeof(InputHeader));
@@ -901,12 +905,12 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 	int* Image2;
 
 	iRes = LoadImageFile(&Image1, ImageInputFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Input file read error", L"File I/O error", MB_OK);
 		return iRes;
 	}
 	iRes = LoadImageFile(&Image2, ImageInputFile2, &InputHeader2);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		delete[] Image1;
 		MessageBox(hDlg, L"Input fileto append read error", L"File I/O error", MB_OK);
 		return iRes;
@@ -922,7 +926,7 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 		delete[] Image1;
 		delete[] Image2;
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 	// save new imahe header
 	fwrite(&OutputHeader, sizeof(OutputHeader), 1, Out);
@@ -953,7 +957,7 @@ int ImageAppendRight(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2,
 		DisplayImage(ImageOutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -1078,7 +1082,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 
 	// read input image file
 	iRes = LoadImageFile(&InputImage, InputFile, &ImgHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load image file", L"File I/O", MB_OK);
 		return iRes;
 	}
@@ -1086,26 +1090,26 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 	if (LinearOnly && ImgHeader.Ysize != 1) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Input file requires linear image file (Ysize=1)", L"File incompatible", MB_OK);
-		return -4;
+		return APPERR_FILETYPE;
 	}
 
 	NumKernels = ReadReoderingFile(TextInput, &DecomX, &DecomY, &DecomXsize, &DecomYsize, LinearOnly, EnableBatch);
 	if (NumKernels <= 0) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Pixel reodering file read failure", L"File incompatible", MB_OK);
-		return -4;
+		return APPERR_FILETYPE;
 	}
 
 	if (LinearOnly && DecomYsize != 1) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Reordering kernel Ysize must be 1", L"File incompatible", MB_OK);
-		return -4;
+		return APPERR_FILETYPE;
 	}
 
 	if (ImgHeader.Xsize % DecomXsize != 0 || ImgHeader.Ysize % DecomYsize != 0) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Input image must be divisble by\nreordering list size in both x and y", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int FrameSize = ImgHeader.Xsize * ImgHeader.Ysize;
@@ -1115,7 +1119,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		delete[] DecomX;
 		delete[] InputImage;
 		MessageBox(hDlg, L"Decom address table allocation failure", L"System Error", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int* OutputImage;
@@ -1126,7 +1130,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		delete[] InputImage;
 		delete[] DecomAddress;
 		MessageBox(hDlg, L"Output Image allocation failure", L"System Error", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int KernelOffset;
@@ -1172,7 +1176,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 				delete[] DecomAddress;
 				delete[] OutputImage;
 				MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-				return -2;
+				return APPERR_FILEOPEN;
 			}
 			// change the fname portion to add _kernel# 1 based
 			// use Kernel+1
@@ -1189,7 +1193,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 				delete[] DecomAddress;
 				delete[] OutputImage;
 				MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-				return -2;
+				return APPERR_FILEOPEN;
 			}
 			// create BMP of file
 			if (GenerateBMP) {
@@ -1201,7 +1205,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 					delete[] DecomAddress;
 					delete[] OutputImage;
 					MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-					return -2;
+					return APPERR_FILEOPEN;
 				}
 			}
 
@@ -1215,7 +1219,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 				delete[] DecomAddress;
 				delete[] OutputImage;
 				MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-				return -2;
+				return APPERR_FILEOPEN;
 			}
 		}
 		else {
@@ -1228,7 +1232,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 				delete[] DecomAddress;
 				delete[] OutputImage;
 				MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-				return -2;
+				return APPERR_FILEOPEN;
 			}
 		}
 
@@ -1267,7 +1271,7 @@ int PixelReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -1295,7 +1299,7 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 
 	ErrNum = _wfopen_s(&TextIn, TextInput, L"r");
 	if (!TextIn) {
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	// first line in the reordering file determines
@@ -1309,15 +1313,15 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 		iFormat = fscanf_s(TextIn, "%d,%d,%d", DecomXsize, DecomYsize, &LinearFormat);
 		if (iFormat != 2 && iFormat != 3) {
 			fclose(TextIn);
-			return -4;
+			return APPERR_FILETYPE;
 		}
 	}
 	if (((*DecomXsize) * (*DecomYsize)) <= 0) {
-		return -4;
+		return APPERR_FILETYPE;
 	}
 
 	if (LinearOnly && (*DecomYsize != 1)) {
-		return -4;
+		return APPERR_FILETYPE;
 	}
 
 	// scan file to determine number of kernels to process
@@ -1335,14 +1339,14 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 			}
 			else {
 				iRes = fscanf_s(TextIn, "%d", &x);
-				if (iRes != 1) break;
+				if (iRes != APP_SUCCESS) break;
 			}
 			NumTotal++;
 		}
 		NumKernels = NumTotal / ((*DecomXsize) * (*DecomYsize));
 		if (NumKernels == 0) {
 			fclose(TextIn);
-			return 0;
+			return APPERR_PARAMETER;
 		}
 
 		// reread start of file
@@ -1356,13 +1360,13 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 	DecomX = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize) * (size_t)NumKernels];
 	if (DecomX == NULL) {
 		fclose(TextIn);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 	DecomY = new int[(size_t)(*DecomXsize) * (size_t)(*DecomYsize) * (size_t)NumKernels];
 	if (DecomY == NULL) {
 		delete[] DecomY;
 		fclose(TextIn);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	if (iFormat == 2) {
@@ -1372,7 +1376,7 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 				delete[] DecomY;
 				delete[] DecomX;
 				fclose(TextIn);
-				return -4;
+				return APPERR_FILETYPE;
 			}
 		}
 	}
@@ -1381,11 +1385,11 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 		for (int i = 0; i < ((*DecomXsize) * (*DecomYsize) * NumKernels); i++) {
 			DecomY[i] = 0;
 			iRes = fscanf_s(TextIn, "%d", &DecomX[i]);
-			if (iRes != 1) {
+			if (iRes != APP_SUCCESS) {
 				delete[] DecomY;
 				delete[] DecomX;
 				fclose(TextIn);
-				return -4;
+				return APPERR_FILETYPE;
 			}
 			if (LinearFormat == 1) {
 				//convert to zero based
@@ -1395,12 +1399,12 @@ int ReadReoderingFile(WCHAR* TextInput, int** DecomXptr, int** DecomYptr,
 				fclose(TextIn);
 				delete[] DecomY;
 				delete[] DecomX;
-				return -4;
+				return APPERR_FILETYPE;
 			}
 		}
 		//Convert format into relative pixel map
 		iRes = ConvertDecomList2Relative(DecomX, DecomY, *DecomXsize, *DecomYsize, NumKernels);
-		if (iRes != 1) {
+		if (iRes != APP_SUCCESS) {
 			// report error number
 			NumKernels = iRes;
 		}
@@ -1423,12 +1427,12 @@ int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int Deco
 {
 	int* NewDecomX = new int[(size_t)DecomXsize * (size_t)DecomYsize * (size_t)NumKernels];
 	if (NewDecomX == NULL) {
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 	int* NewDecomY = new int[(size_t)DecomXsize * (size_t)DecomYsize * (size_t)NumKernels];
 	if (NewDecomY == NULL) {
 		delete[] NewDecomX;
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int Xpos, Ypos;
@@ -1445,7 +1449,7 @@ int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int Deco
 					// needs to be format 2 or 3
 					delete[] NewDecomX;
 					delete[] NewDecomY;
-					return 0;
+					return APPERR_PARAMETER;
 				}
 				// convert to new position relative to current position
 				Xpos = DecomX[Index] % DecomXsize;
@@ -1464,7 +1468,7 @@ int ConvertDecomList2Relative(int* DecomX, int* DecomY, int DecomXsize, int Deco
 
 	delete[] NewDecomX;
 	delete[] NewDecomY;
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -1539,7 +1543,7 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load input image, check format", L"File I/O error", MB_OK);
 		return iRes;
 	}
@@ -1557,7 +1561,7 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 	if (!Out) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Could not open results file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	int LeftAddress;
@@ -1664,7 +1668,7 @@ int FoldImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColumn
 	TCHAR pszMessageBuf[MAX_PATH];
 	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH, TEXT("Output image size is: %d,%d"), (int)OutputXsize, (int)InputYsize);
 	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -1701,7 +1705,7 @@ int FoldImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColum
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load input image, check format", L"File I/O error", MB_OK);
 		return iRes;
 	}
@@ -1712,7 +1716,7 @@ int FoldImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColum
 	if (InputXsize % 2) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"xsize must be even", L"Input file incompatible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
@@ -1720,7 +1724,7 @@ int FoldImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColum
 		delete[] InputImage;
 		_fcloseall();
 		MessageBox(hDlg, L"Could not open results file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	int LeftAddress;
@@ -1827,7 +1831,7 @@ int FoldImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldColum
 	TCHAR pszMessageBuf[MAX_PATH];
 	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH, TEXT("Output image size is: %d,%d"), (int)OutputXsize, (int)InputYsize);
 	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-	return 1;
+	return APP_SUCCESS;
 }
 
 
@@ -1869,7 +1873,7 @@ int FoldImageDown(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load input image, check format", L"File I/O error", MB_OK);
 		return iRes;
 	}
@@ -1880,7 +1884,7 @@ int FoldImageDown(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 	if (InputYsize % 2) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"ysize must be even", L"Input file incompatible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
@@ -1888,7 +1892,7 @@ int FoldImageDown(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 		delete[] InputImage;
 		_fcloseall();
 		MessageBox(hDlg, L"Could not open results file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	int TopAddress;
@@ -1976,7 +1980,7 @@ int FoldImageDown(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 	TCHAR pszMessageBuf[MAX_PATH];
 	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH, TEXT("Output image size is: %d,%d"), (int)InputXsize, (int)OutputYsize);
 	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-	return 1;
+	return APP_SUCCESS;
 }
 
 //*******************************************************************************
@@ -2017,7 +2021,7 @@ int FoldImageUp(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load input image, check format", L"File I/O error", MB_OK);
 		return iRes;
 	}
@@ -2028,7 +2032,7 @@ int FoldImageUp(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 	if (InputYsize % 2) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"ysize must be even", L"Input file incompatible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
@@ -2036,7 +2040,7 @@ int FoldImageUp(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 		delete[] InputImage;
 		_fcloseall();
 		MessageBox(hDlg, L"Could not open results file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	int TopAddress;
@@ -2125,7 +2129,7 @@ int FoldImageUp(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int FoldRow)
 	TCHAR pszMessageBuf[MAX_PATH];
 	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH, TEXT("Output image size is: %d,%d"), (int)InputXsize, (int)OutputYsize);
 	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -2164,7 +2168,7 @@ int AccordionImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Accor
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load input image, check format", L"File I/O error", MB_OK);
 		return iRes;
 	}
@@ -2175,13 +2179,13 @@ int AccordionImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Accor
 	if (InputXsize % 2) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"xsize must be even", L"Input file incompatible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (InputXsize % AccordionSize) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"ysize must be divisble by accordion size", L"Input file incompatible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int LeftAddress;
@@ -2209,7 +2213,7 @@ int AccordionImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Accor
 	if (OutputImage == NULL) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Output Image alloc failure", L"File I/O", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	// fold accordian
@@ -2237,7 +2241,7 @@ int AccordionImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Accor
 	if (Out == NULL) {
 		free(OutputImage);
 		MessageBox(hDlg, L"Could not open results file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	// write new header
@@ -2270,7 +2274,7 @@ int AccordionImageLeft(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Accor
 	TCHAR pszMessageBuf[MAX_PATH];
 	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH, TEXT("Output image size is: %d,%d"), (int)OutputXsize, (int)InputYsize);
 	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -2312,7 +2316,7 @@ int AccordionImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Acco
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load input image, check format", L"File I/O error", MB_OK);
 		return iRes;
 	}
@@ -2323,13 +2327,13 @@ int AccordionImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Acco
 	if (InputXsize % 2) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"xsize must be even", L"Input file incompatible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (InputXsize % AccordionSize) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"ysize must be divisble by accordion size", L"Input file incompatible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int LeftAddress;
@@ -2357,7 +2361,7 @@ int AccordionImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Acco
 	if (OutputImage == NULL) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Output Image alloc failure", L"File I/O", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	// fold accordian
@@ -2385,7 +2389,7 @@ int AccordionImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Acco
 	if (Out == NULL) {
 		free(OutputImage);
 		MessageBox(hDlg, L"Could not open results file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	// write new header
@@ -2418,7 +2422,7 @@ int AccordionImageRight(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Acco
 	TCHAR pszMessageBuf[MAX_PATH];
 	StringCchPrintf(pszMessageBuf, (size_t)MAX_PATH, TEXT("Output image size is: %d,%d"), (int)OutputXsize, (int)InputYsize);
 	MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -2456,7 +2460,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
 	int iRes;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Error reading input file", L"File I/O", MB_OK);
 		return iRes;
 	}
@@ -2464,7 +2468,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (!Out) {
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	// do not change image size, right pad row to make up for skipped pixels at be start of row
@@ -2540,7 +2544,7 @@ int LeftShiftImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile)
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -2596,14 +2600,14 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load input image", L"File I/O error", MB_OK);
 		return iRes;
 	}
 
 	OutputImage = (int*)calloc((size_t)ImageHeader.Xsize * (size_t)ImageHeader.Ysize * (size_t)ImageHeader.NumFrames, sizeof(int));
 	if (OutputImage == NULL) {
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 	// read in convolution kernel
 	errno_t ErrNum;
@@ -2611,7 +2615,7 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 	ErrNum = _wfopen_s(&TextIn, TextInput, L"r");
 	if (!TextIn) {
 		MessageBox(hDlg, L"Could not open decom file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	iRes = fscanf_s(TextIn, "%d,%d", &KernelXsize, &KernelYsize);
@@ -2620,7 +2624,7 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 		delete[] InputImage;
 		free(OutputImage);
 		MessageBox(hDlg, L"bad format, kernel file", L"File I/O", MB_OK);
-		return -3;
+		return APPERR_FILEREAD;
 	}
 
 	Kernel = new float[(size_t)KernelXsize * (size_t)KernelYsize];
@@ -2629,19 +2633,19 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 		delete[] InputImage;
 		free(OutputImage);
 		MessageBox(hDlg, L"Kernel allocation failure", L"File I/O", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	for (int i = 0; i < (KernelXsize * KernelYsize); i++) {
 		Kernel[i] = 0;
 		iRes = fscanf_s(TextIn, "%f", &Kernel[i]);
-		if (iRes != 1) {
+		if (iRes != APP_SUCCESS) {
 			delete[] Kernel;
 			fclose(TextIn);
 			delete[] InputImage;
 			free(OutputImage);
 			MessageBox(hDlg, L"bad format or too small, Kernel file", L"File I/O", MB_OK);
-			return -3;
+			return APPERR_FILEREAD;
 		}
 	}
 	fclose(TextIn);
@@ -2659,7 +2663,7 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 	if (Out == NULL) {
 		free(OutputImage);
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	// write out image header
@@ -2685,7 +2689,7 @@ int ConvolveImage(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFi
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -2801,13 +2805,13 @@ int AddSubtractImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* Out
 	IMAGINGHEADER Input2Header;
 
 	iRes = LoadImageFile(&InputImage1, InputFile, &Input1Header);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load first input image", L"File I/O error", MB_OK);
 		return iRes;
 	}
 
 	iRes = LoadImageFile(&InputImage2, InputFile2, &Input2Header);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		delete[] InputImage1;
 		MessageBox(hDlg, L"Could not load szecond input image", L"File I/O error", MB_OK);
 		return iRes;
@@ -2816,14 +2820,14 @@ int AddSubtractImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* Out
 	if (Input1Header.Xsize != Input2Header.Xsize || Input1Header.Ysize != Input2Header.Ysize ||
 		Input1Header.NumFrames != Input2Header.NumFrames) {
 		MessageBox(hDlg, L"Input files must be same xsize, ysize, and # of frames", L"Files incomptaible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 	OutputImage = new int[(size_t)Input1Header.Xsize * (size_t)Input1Header.Ysize * (size_t)Input1Header.NumFrames];
 	if (OutputImage == NULL) {
 		delete[] InputImage1;
 		delete[] InputImage2;
 		MessageBox(hDlg, L"Could not allocate output image", L"File I/O error", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	for (int i = 0; i < (Input1Header.Xsize * Input1Header.Ysize * Input1Header.NumFrames); i++) {
@@ -2843,7 +2847,7 @@ int AddSubtractImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* Out
 	if (Out == NULL) {
 		delete[] OutputImage;
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	//write output image
@@ -2872,7 +2876,7 @@ int AddSubtractImages(HWND hDlg, WCHAR* InputFile, WCHAR* InputFile2, WCHAR* Out
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -2904,7 +2908,7 @@ int RotateImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load first input image", L"File I/O error", MB_OK);
 		return iRes;
 	}
@@ -2971,7 +2975,7 @@ int RotateImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 	if (Out == NULL) {
 		delete[] OutputImage;
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	//write output image
@@ -3000,7 +3004,7 @@ int RotateImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -3032,7 +3036,7 @@ int MirrorImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 	IMAGINGHEADER ImageHeader;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load first input image", L"File I/O error", MB_OK);
 		return iRes;
 	}
@@ -3092,7 +3096,7 @@ int MirrorImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 	if (Out == NULL) {
 		delete[] OutputImage;
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	//write output image
@@ -3121,7 +3125,7 @@ int MirrorImage(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Direction)
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -3167,7 +3171,7 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 	int iRes;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		return iRes;
 	}
 	if (Xsize == 0) Xsize = ImageHeader.Xsize;
@@ -3176,7 +3180,7 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 
 	if (ImageHeader.Xsize * ImageHeader.Ysize != Xsize * Ysize) {
 		delete[] InputImage;
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	ImageHeader.Xsize = Xsize;
@@ -3187,7 +3191,7 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
 		delete[] InputImage;
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	//write output image
@@ -3215,7 +3219,7 @@ int ResizeImage(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int P
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -3279,13 +3283,13 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 
 	CalculateReOrder(0, 0, Xsize, Ysize, Algorithm, P1, P2, P3, &ResizeFlag);
 	if (ResizeFlag < 0) {
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (ResizeFlag) {
 		if (ImageHeader.Xsize * ImageHeader.Ysize != Xsize * Ysize) {
 			delete[] InputImage;
-			return 0;
+			return APPERR_PARAMETER;
 		}
 
 		ImageHeader.Xsize = Xsize;
@@ -3329,7 +3333,7 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
 		delete[] InputImage;
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	//write output image
@@ -3363,7 +3367,7 @@ int ReorderAlg(WCHAR* InputFile, WCHAR* OutputFile, int Xsize, int Ysize, int Pi
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -3410,14 +3414,14 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 	int KernelYsize;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		return iRes;
 	}
 	// read decimation kernel
 	ErrNum = _wfopen_s(&TextIn, TextFile, L"r");
 	if (!TextIn) {
 		delete[] InputImage;
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 
@@ -3425,31 +3429,31 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 	if (iRes != 2) {
 		fclose(TextIn);
 		delete[] InputImage;
-		return -3;
+		return APPERR_FILEREAD;
 	}
 
 	Kernel = new int[(size_t)KernelXsize * (size_t)KernelYsize];
 	if (Kernel == NULL) {
 		fclose(TextIn);
 		delete[] InputImage;
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	for (int i = 0; i < (KernelXsize * KernelYsize); i++) {
 		Kernel[i] = 0;
 		iRes = fscanf_s(TextIn, "%d", &Kernel[i]);
-		if (iRes != 1) {
+		if (iRes != APP_SUCCESS) {
 			delete[] Kernel;
 			fclose(TextIn);
 			delete[] InputImage;
-			return -3;
+			return APPERR_FILEREAD;
 		}
 		if (Kernel[i] < 0 || Kernel[i]>1) {
 			// kernel values can only be 0 or 1
 			delete[] Kernel;
 			fclose(TextIn);
 			delete[] InputImage;
-			return 0;
+			return APPERR_PARAMETER;
 		}
 	}
 	fclose(TextIn);
@@ -3481,7 +3485,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 				// for all nonblank rows
 				delete[] Kernel;
 				delete[] InputImage;
-				return 0;
+				return APPERR_PARAMETER;
 			}
 		}
 		else {
@@ -3492,7 +3496,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 	if (NumFoundinRow == 0) {
 		delete[] Kernel;
 		delete[] InputImage;
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int OutXsize;
@@ -3506,7 +3510,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize * (size_t)ImageHeader.NumFrames];
 	if (OutputImage == NULL) {
 		delete[] InputImage;
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int Kaddress;
@@ -3541,7 +3545,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 	//write output image
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
@@ -3572,7 +3576,7 @@ int DecimateImage(WCHAR* InputFile, WCHAR* TextFile, WCHAR* OutputFile, int Scal
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -3610,18 +3614,18 @@ int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile,
 	FILE* Out;
 	int iRes;
 	if (Xsize <= 0 || Ysize <= 0) {
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		delete[]InputImage;
 		return iRes;
 	}
 
 	if ((ImageHeader.Xsize % Xsize) != 0 && (ImageHeader.Ysize % Ysize) != 0) {
 		// x,y images size must be divisible by x,y decimate size
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int OutXsize;
@@ -3634,7 +3638,7 @@ int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile,
 	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize * (size_t)ImageHeader.NumFrames];
 	if (OutputImage == NULL) {
 		delete[] InputImage;
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int PixelSum;
@@ -3667,7 +3671,7 @@ int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile,
 	//write output image
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
@@ -3695,7 +3699,7 @@ int StdDecimateImage(WCHAR* InputFile, WCHAR* OutputFile,
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -3716,14 +3720,14 @@ int MathConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value,
 	if (Warn) *ArithmeticFlag = 0;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		return iRes;
 	}
 
 	OutputImage = new int[(size_t)InputHeader.Xsize * (size_t)InputHeader.Ysize * (size_t)InputHeader.NumFrames];
 	if (OutputImage == NULL) {
 		delete[] InputImage;
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	for (int i = 0; i < (InputHeader.Xsize * InputHeader.Ysize * InputHeader.NumFrames); i++) {
@@ -3753,7 +3757,7 @@ int MathConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value,
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
 		delete[] OutputImage;
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	//write output image
@@ -3788,7 +3792,7 @@ int MathConstant2Image(WCHAR* InputFile, WCHAR* OutputFile, int Value,
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -3822,18 +3826,18 @@ int ReplicateImage(WCHAR* InputFile, WCHAR* OutputFile,
 	FILE* Out;
 	int iRes;
 	if (Xsize <= 0 || Ysize <= 0) {
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		delete[]InputImage;
 		return iRes;
 	}
 
 	if ((ImageHeader.Xsize % Xsize) != 0 && (ImageHeader.Ysize % Ysize) != 0) {
 		// x,y images size must be divisible by x,y decimate size
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int OutXsize;
@@ -3846,7 +3850,7 @@ int ReplicateImage(WCHAR* InputFile, WCHAR* OutputFile,
 	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize * (size_t)ImageHeader.NumFrames];
 	if (OutputImage == NULL) {
 		delete[] InputImage;
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int PixelValue;
@@ -3877,7 +3881,7 @@ int ReplicateImage(WCHAR* InputFile, WCHAR* OutputFile,
 	//write output image
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	fwrite(&ImageHeader, sizeof(ImageHeader), 1, Out);
@@ -3905,7 +3909,7 @@ int ReplicateImage(WCHAR* InputFile, WCHAR* OutputFile,
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -3977,16 +3981,16 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 
 	if (xsizesymbol == 0 || ysizesymbol == 0) {
 		MessageBox(hDlg, L"X or Y symbol size can not be 0", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (Approach != 1 && Approach != 2) {
 		MessageBox(hDlg, L"Input file aprroach invalid", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	iRes = LoadImageFile(&InputImage, InputFile, &ImageHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Error reading input file", L"File I/O", MB_OK);
 		return iRes;
 	}
@@ -3994,21 +3998,21 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 	if (((ImageHeader.Xsize*ImageHeader.Ysize) % (xsizesymbol * ysizesymbol))!=0) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"input x,y size must be divisible by x,y symbol size", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (Approach == 2) {
 		if (ImageHeader.Ysize % ysizesymbol != 0) {
 			delete[] InputImage;
 			MessageBox(hDlg, L"for 2D, input y size must be divisible by y symbol size", L"File I/O", MB_OK);
-			return 0;
+			return APPERR_PARAMETER;
 		}
 	}
 
 	if (ImageHeader.NumFrames != 1) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Multiple frame files are not supported", L"File I/O", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int NumSymbolsGroups = 0;	// number of 'sentences' in output
@@ -4024,7 +4028,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 	if (SymbolList == NULL) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"SymbolLIst memory allocation failure", L"File I/O", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	if (Approach == 1) {
@@ -4065,7 +4069,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 		if (!TempFile) {
 			delete[] SymbolList;
 			MessageBox(hDlg, L"Could not open working image file", L"File I/O", MB_OK);
-			return -2;
+			return APPERR_FILEOPEN;
 		}
 
 		// write out image header
@@ -4155,7 +4159,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 	if (LongestSymbolGroup == 0) {
 		// this is an empty file
 		MessageBox(hDlg, L"No symbols found in the file", L"File empty", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int* OutputImage;
@@ -4170,14 +4174,14 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 	OutputGroup = new int[(size_t)OutXsize* ysizesymbol];
 	if (OutputGroup == NULL) {
 		delete[] SymbolList;
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	OutputImage = new int[(size_t)OutXsize * (size_t)OutYsize];
 	if (OutputImage == NULL) {
 		delete[] OutputGroup;
 		delete[] SymbolList;
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	// now that we know the sizes
@@ -4313,7 +4317,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 	if (!Out) {
 		delete[] OutputImage;
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	// write out image header	
@@ -4380,7 +4384,7 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -4390,17 +4394,17 @@ int ExtractSymbols(HWND hDlg, WCHAR* InputFile, WCHAR *OutputFile, int MaxNull,
 // Private function
 //
 //******************************************************************************
-int SymbolTest(int* InputImage, int xsize, int ysize, int Yoffset,int NullValue) {
+BOOL SymbolTest(int* InputImage, int xsize, int ysize, int Yoffset,int NullValue) {
 	int Address;
 	for (int y = 0; y < ysize; y++) {
 		Address = Yoffset * y;
 		for (int x = 0; x < xsize; x++) {
 			if (InputImage[Address + x] != NullValue) {
-				return 1;
+				return TRUE;
 			}
 		}
 	}
-	return 0;
+	return FALSE;
 }
 
 //******************************************************************************
@@ -4484,19 +4488,19 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 	int iRes;
 
 	iRes = ReadImageHeader(ImageInputFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"First image file is not valid", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
 	iRes = ReadImageHeader(ImageInputFile2, &InputHeader2);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Image file to append is not valid", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
 
 	if (InputHeader.NumFrames != 1 && InputHeader2.NumFrames != 1) {
 		MessageBox(hDlg, L"input files must be single frame", L"Incompatible file type", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	memcpy_s(&OutputHeader, sizeof(OutputHeader), &InputHeader, sizeof(InputHeader));
@@ -4512,12 +4516,12 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 	int* Image2;
 
 	iRes = LoadImageFile(&Image1, ImageInputFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Input file read error", L"File I/O error", MB_OK);
 		return iRes;
 	}
 	iRes = LoadImageFile(&Image2, ImageInputFile2, &InputHeader2);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		delete[] Image1;
 		MessageBox(hDlg, L"Input file to inset/add read error", L"File I/O error", MB_OK);
 		return iRes;
@@ -4532,7 +4536,7 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 		delete[] Image1;
 		delete[] Image2;
 		MessageBox(hDlg, L"Could not allocate output image", L"File I/O", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int Address;
@@ -4592,7 +4596,7 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 	ErrNum = _wfopen_s(&Out, ImageOutputFile, L"wb");
 	if (Out == NULL) {
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	PIXEL Pixel;
@@ -4623,7 +4627,7 @@ int InsertImage(HWND hDlg, WCHAR* ImageInputFile, WCHAR* ImageInputFile2, WCHAR*
 		DisplayImage(ImageOutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -4683,19 +4687,19 @@ int Image2Stream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitDepth, i
 	int NumFrames;
 
 	iRes = LoadImageFile(&InputImage, InputFile, &InputHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Input file is not image file", L"Incompatible file type", MB_OK);
 		return iRes;
 	}
 
 	if (BitDepth > InputHeader.PixelSize * 8) {
 		MessageBox(hDlg, L"Bit Depth is larger than image file pixel size", L"Bad Parameters", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (BitDepth > 32 || BitDepth < 0) {
 		MessageBox(hDlg, L"0 <= Bit Depth <= 32", L"Bad Parameters", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (BitDepth == 0) {
@@ -4704,7 +4708,7 @@ int Image2Stream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitDepth, i
 
 	if (Frames < 0) {
 		MessageBox(hDlg, L"Number of frames must be >=0", L"Bad Parameters", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (Frames == 0) {
@@ -4729,7 +4733,7 @@ int Image2Stream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitDepth, i
 	ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
 	if (Out == NULL) {
 		delete[] InputImage;
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	// write out header if Header is TRUE
@@ -4780,7 +4784,7 @@ int Image2Stream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int BitDepth, i
 	fclose(Out);
 	delete[] InputImage;
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -4808,7 +4812,7 @@ int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePi
 	ErrNum = _wfopen_s(&BatchFile, InputFile, L"r");
 	if (BatchFile == NULL) {
 		MessageBox(hDlg, L"Could not open input batch file", L"File error", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 	while (!feof(BatchFile)) {
 
@@ -4818,7 +4822,7 @@ int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePi
 			if (iLine == 0) {
 				MessageBox(hDlg, L"Empty batch file", L"Nothing to process", MB_OK);
 				fclose(BatchFile);
-				return 0;
+				return APPERR_PARAMETER;
 			}
 			break;
 		}
@@ -4827,7 +4831,7 @@ int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePi
 			iLine++;
 			continue;
 		}
-		iRes = wcslen(InputImageFile);
+		iRes = (int) wcslen(InputImageFile);
 		if (iRes > 0) {
 			if (InputImageFile[iRes - 1] == '\n') {
 				// remove newline from string
@@ -4853,7 +4857,7 @@ int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePi
 			}
 		}
 		if (Found) {
-			iRes = wcslen(OutputImageFile);
+			iRes = (int) wcslen(OutputImageFile);
 			if (iRes > 0) {
 				if (OutputImageFile[iRes - 1] == '\n') {
 					// remove newline from string
@@ -4869,12 +4873,8 @@ int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePi
 		}
 
 		// we have file pair to process
-		int SaveDisplayResults;
-		SaveDisplayResults = DisplayResults;
-		DisplayResults = 0;
 		iRes = PixelReorder(hDlg, TextInput, InputImageFile, OutputImageFile, ScalePixel, FALSE, EnableBatch, GenerateBMP, Invert);
-		DisplayResults = SaveDisplayResults;
-		if (iRes != 1) {
+		if (iRes != APP_SUCCESS) {
 			break;
 		}
 		if (!EnableBatch && GenerateBMP) {
@@ -4912,7 +4912,7 @@ int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePi
 			iProcessed);
 		MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
 	}
-	return 1;
+	return APP_SUCCESS;
 }
 
 //************************************************************************************
@@ -4920,18 +4920,18 @@ int PixelReorderBatch(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, int ScalePi
 //
 //
 //************************************************************************************
-int StringBlankorComnent(WCHAR* Line,int LineSize)
+BOOL StringBlankorComnent(WCHAR* Line,int LineSize)
 {
 	int iLen;
-	iLen = wcslen(Line);
-	if (iLen == 0) return 1;
+	iLen = (int) wcslen(Line);
+	if (iLen == 0) return TRUE;
 	for (int i = 0; i < iLen; i++) {
 		if (Line[i] == '/' || Line[i] == ';' || Line[i] == ':') {
-			return 1;
+			return TRUE;
 		}
-		if (!iswspace(Line[i])) return 0;
+		if (!iswspace(Line[i])) return FALSE;
 	}
-	return 1;
+	return TRUE;
 }
 
 //******************************************************************************
@@ -4970,20 +4970,20 @@ int AddSubtractKernel(HWND hDlg, WCHAR* InputFile, WCHAR* TextFile, WCHAR* Outpu
 	IMAGINGHEADER Input1Header;
 
 	iRes = LoadImageFile(&InputImage1, InputFile, &Input1Header);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load first input image", L"File I/O error", MB_OK);
 		return iRes;
 	}
 
 	iRes = ReadIntKernelFile(hDlg, TextFile, &Kernel, &KernelXsize, &KernelYsize);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		delete[] InputImage1;
 		return iRes;
 	}
 
 	if ((Input1Header.Xsize % KernelXsize !=0)|| (Input1Header.Ysize % KernelYsize!=0)) {
 		MessageBox(hDlg, L"Input file x,y size must be divisible by kernel x,y size", L"Files incomptaible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	OutputImage = new int[(size_t)Input1Header.Xsize * (size_t)Input1Header.Ysize * (size_t)Input1Header.NumFrames];
@@ -4991,7 +4991,7 @@ int AddSubtractKernel(HWND hDlg, WCHAR* InputFile, WCHAR* TextFile, WCHAR* Outpu
 		delete[] InputImage1;
 		delete[] Kernel;
 		MessageBox(hDlg, L"Could not allocate output image", L"File I/O error", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 	int KernelValue;
 	int FrameOffset;
@@ -5024,7 +5024,7 @@ int AddSubtractKernel(HWND hDlg, WCHAR* InputFile, WCHAR* TextFile, WCHAR* Outpu
 	if (Out == NULL) {
 		delete[] OutputImage;
 		MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	//write output image
@@ -5053,7 +5053,7 @@ int AddSubtractKernel(HWND hDlg, WCHAR* InputFile, WCHAR* TextFile, WCHAR* Outpu
 		DisplayImage(OutputFile);
 	}
 	
-	return 1;
+	return APP_SUCCESS;
 }
 
 //*******************************************************************************
@@ -5076,31 +5076,31 @@ int ReadIntKernelFile(HWND hDlg, WCHAR* TextInput, int** Kernelptr, int* KernelX
 	ErrNum = _wfopen_s(&TextIn, TextInput, L"r");
 	if (!TextIn) {
 		MessageBox(hDlg, L"Could not open decom file", L"File I/O", MB_OK);
-		return -2;
+		return APPERR_FILEOPEN;
 	}
 
 	iRes = fscanf_s(TextIn, "%d,%d", &Xsize, &Ysize);
 	if (iRes != 2) {
 		fclose(TextIn);
 		MessageBox(hDlg, L"bad format, kernel file", L"File I/O", MB_OK);
-		return -3;
+		return APPERR_FILEREAD;
 	}
 
 	Kernel = new int[(size_t)Xsize * (size_t)Ysize];
 	if (Kernel == NULL) {
 		fclose(TextIn);
 		MessageBox(hDlg, L"Kernel allocation failure", L"File I/O", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	for (int i = 0; i < ((Xsize) * (Ysize)); i++) {
 		Kernel[i] = 0;
 		iRes = fscanf_s(TextIn, "%d", &Kernel[i]);
-		if (iRes != 1) {
+		if (iRes != APP_SUCCESS) {
 			delete[] Kernel;
 			fclose(TextIn);
 			MessageBox(hDlg, L"bad format or too small, Kernel file", L"File I/O", MB_OK);
-			return -3;
+			return APPERR_FILEREAD;
 		}
 	}
 	fclose(TextIn);
@@ -5109,7 +5109,7 @@ int ReadIntKernelFile(HWND hDlg, WCHAR* TextInput, int** Kernelptr, int* KernelX
 	*KernelYsize = Ysize;
 	*Kernelptr = Kernel;
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************
@@ -5246,7 +5246,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 
 	// read input image file
 	iRes = LoadImageFile(&InputImage, InputFile, &ImgHeader);
-	if (iRes != 1) {
+	if (iRes != APP_SUCCESS) {
 		MessageBox(hDlg, L"Could not load image file", L"File I/O", MB_OK);
 		return iRes;
 	}
@@ -5258,19 +5258,19 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 	if (LinearOnly && ImgHeader.Ysize != 1) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Input file requires linear image file (Ysize=1)", L"File incompatible", MB_OK);
-		return -4;
+		return APPERR_FILETYPE;
 	}
 
 	if (Xsize <= 0 || Ysize <= 0) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Xsize and Ysize must be >= 1", L"Bad Parameters", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (ImgHeader.Xsize % Xsize != 0 || ImgHeader.Ysize % Ysize) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Image x,y size must be divisble\nby the x,y block size", L"Bad Parameters", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	NumXblocks = ImgHeader.Xsize / Xsize;
@@ -5280,7 +5280,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 	if (NumKernels <= 0) {
 		delete[] InputImage;
 		MessageBox(hDlg, L"Pixel reodering file read failure", L"File incompatible", MB_OK);
-		return -4;
+		return APPERR_FILETYPE;
 	}
 
 	if (DecomXsize != NumXblocks || DecomYsize != NumYblocks) {
@@ -5288,7 +5288,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		delete[] DecomX;
 		delete[] DecomY;
 		MessageBox(hDlg, L"x or y kernel size does not equal\nthe number of x or y blocks", L"Bad Parameters", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	if (LinearOnly && DecomYsize != 1) {
@@ -5296,7 +5296,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		delete[] DecomX;
 		delete[] DecomY;
 		MessageBox(hDlg, L"Reordering kernel Ysize must be 1", L"File incompatible", MB_OK);
-		return 0;
+		return APPERR_PARAMETER;
 	}
 
 	int FrameSize = ImgHeader.Xsize * ImgHeader.Ysize;
@@ -5306,7 +5306,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		delete[] DecomX;
 		delete[] InputImage;
 		MessageBox(hDlg, L"Decom address table allocation failure", L"System Error", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int* OutputImage;
@@ -5317,7 +5317,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		delete[] InputImage;
 		delete[] DecomAddress;
 		MessageBox(hDlg, L"Output Image allocation failure", L"System Error", MB_OK);
-		return -1;
+		return APPERR_MEMALLOC;
 	}
 
 	int KernelOffset;
@@ -5367,7 +5367,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 				delete[] DecomAddress;
 				delete[] OutputImage;
 				MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-				return -2;
+				return APPERR_FILEOPEN;
 			}
 			// change the fname portion to add _kernel# 1 based
 			// use Kernel+1
@@ -5384,7 +5384,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 				delete[] DecomAddress;
 				delete[] OutputImage;
 				MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-				return -2;
+				return APPERR_FILEOPEN;
 			}
 			// create BMP of file
 			if (GenerateBMP) {
@@ -5396,7 +5396,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 					delete[] DecomAddress;
 					delete[] OutputImage;
 					MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-					return -2;
+					return APPERR_FILEOPEN;
 				}
 			}
 
@@ -5410,7 +5410,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 				delete[] DecomAddress;
 				delete[] OutputImage;
 				MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-				return -2;
+				return APPERR_FILEOPEN;
 			}
 		}
 		else {
@@ -5423,7 +5423,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 				delete[] DecomAddress;
 				delete[] OutputImage;
 				MessageBox(hDlg, L"Could not open output file", L"File I/O", MB_OK);
-				return -2;
+				return APPERR_FILEOPEN;
 			}
 		}
 
@@ -5463,7 +5463,7 @@ int BlockReorder(HWND hDlg, WCHAR* TextInput, WCHAR* InputFile, WCHAR* OutputFil
 		DisplayImage(OutputFile);
 	}
 
-	return 1;
+	return APP_SUCCESS;
 }
 
 //******************************************************************************

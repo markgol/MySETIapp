@@ -50,6 +50,9 @@
 // V1.2.11.1 2023-11-7  Added, new dialog, Reorder blocks[MxM] in image using kernel
 // V1.2.12.1 2023-11-20 Added, Batch extract image dialog
 // V1.2.12.2 2023-11-21 Correction, filename buffer overwrite corrected when generating batchfilelist.txt
+// V1.3.1.1 2023-12-28  Replaced application error numbers with #define to improve clarity
+//                      Changed batch processing to display results for each step in processing
+//                      Added offset x,y loc values to ExtractImage dialog the same as BatchExtractImage
 // 
 // Imaging tools dialog box handlers
 // 
@@ -70,92 +73,15 @@
 #include <atlstr.h>
 #include <strsafe.h>
 #include <atlstr.h>
+#include "AppErrors.h"
+#include "ImageDialog.h"
 #include "Globals.h"
-#include "FileFunctions.h"
+#include "AppFunctions.h"
 #include "Imaging.h"
+#include "FileFunctions.h"
 #include "shellapi.h"
 
 // Add new callback prototype declarations in my MySETIapp.cpp
-
-//*******************************************************************************
-//
-// Message handler for ImageDlg dialog box.
-// This window is used to display an image or BMP file
-// It is a modeless dialog.
-// 
-//*******************************************************************************
-INT_PTR CALLBACK ImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-//    UNREFERENCED_PARAMETER(lParam);
-    switch (message)
-    {
-    case WM_INITDIALOG:
-    {
-        CString csString = L"ImageWindow";
-        RestoreWindowPlacement(hDlg, csString);
-
-        return (INT_PTR)TRUE;
-    }
-
-    case WM_COMMAND:
-        switch (LOWORD(wParam)) {
-
-        case IDCANCEL:
-            if (!DisplayResults) {
-                DestroyWindow(hwndImage);
-                hwndImage = NULL;
-            }
-            else {
-                ShowWindow(hwndImage, SW_HIDE);
-            }
-            return (INT_PTR)TRUE;
-
-        case IDC_GENERATE_BMP:
-        {
-            // Initialize COM
-            HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-
-            // use the default Windows viewer for BMP file
-            ShellExecute(hDlg, 0, szBMPFilename, 0, 0, SW_NORMAL);
-
-            // release COM
-            CoUninitialize();
-
-            return (INT_PTR)TRUE;
-        }
-
-        default:
-            return (INT_PTR)FALSE;
-        }
-    case WM_PAINT:
-    {
-        // redraw iage as required
-        PAINTSTRUCT ps;
-        RECT rc;
-        HDC hDC;
-        if (GetUpdateRect(hDlg, &rc, 0)) {
-            hDC = BeginPaint(hDlg, &ps);
-            if (hDC == NULL) {
-                break;
-            }
-            TextOut(hDC,40,20, szBMPFilename, (int) wcslen(szBMPFilename));
-            TextOut(hDC, 40, 40, L"using external BMP viewer", 25);
-            EndPaint(hDlg, &ps);
-        }
-        break;
-    }
-
-    case WM_DESTROY:
-    {
-        // save window position/size data
-        CString csString = L"ImageWindow";
-        SaveWindowPlacement(hDlg, csString);
-        break;
-    }
-
-    }
-    return (INT_PTR)FALSE;
-}
 
 //*******************************************************************************
 //
@@ -211,6 +137,12 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 
         GetPrivateProfileString(L"ExtractImageDlg", L"OutputYsize", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_OUTPUT_YSIZE, szString);
+
+        GetPrivateProfileString(L"ExtractImageDlg", L"xlocOffset", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_XLOC_OFFSET, szString);
+
+        GetPrivateProfileString(L"ExtractImageDlg", L"ylocOffset", L"0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+        SetDlgItemText(hDlg, IDC_YLOC_OFFSET, szString);
 
         int ScalePixel;
         int Centered;
@@ -301,6 +233,8 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             int SubimageYloc = 0;
             int SubimageXsize = 0;
             int SubimageYsize = 0;
+            int SubimageXlocOffset = 0;
+            int SubimageYlocOffset = 0;
             int OutputXsize = 0;
             int OutputYsize = 0;
             int ScaleBinary = 0;
@@ -314,6 +248,8 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             SubimageYsize = GetDlgItemInt(hDlg, IDC_YSIZE, &bSuccess, TRUE);
             SubimageXloc = GetDlgItemInt(hDlg, IDC_XLOC, &bSuccess, TRUE);
             SubimageYloc = GetDlgItemInt(hDlg, IDC_YLOC, &bSuccess, TRUE);
+            SubimageXlocOffset = GetDlgItemInt(hDlg, IDC_XLOC_OFFSET, &bSuccess, TRUE);
+            SubimageYlocOffset = GetDlgItemInt(hDlg, IDC_YLOC_OFFSET, &bSuccess, TRUE);
             StartFrame = GetDlgItemInt(hDlg, IDC_START_FRAME, &bSuccess, TRUE);
             EndFrame = GetDlgItemInt(hDlg, IDC_END_FRAME, &bSuccess, TRUE);
             OutputXsize = GetDlgItemInt(hDlg, IDC_OUTPUT_XSIZE, &bSuccess, TRUE);
@@ -326,7 +262,8 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             }
 
             ImageExtract(hDlg, InputFile, OutputFile,
-                ScaleBinary, SubimageXloc, SubimageYloc, StartFrame, EndFrame,
+                ScaleBinary, SubimageXloc + SubimageXlocOffset, SubimageYloc + SubimageYlocOffset,
+                StartFrame, EndFrame,
                 SubimageXsize, SubimageYsize,
                 OutputXsize, OutputYsize, Centered);
 
@@ -359,6 +296,12 @@ INT_PTR CALLBACK ExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 
             GetDlgItemText(hDlg, IDC_YLOC, szString, MAX_PATH);
             WritePrivateProfileString(L"ExtractImageDlg", L"yloc", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_XLOC_OFFSET, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractImageDlg", L"xlocOffset", szString, (LPCTSTR)strAppNameINI);
+
+            GetDlgItemText(hDlg, IDC_YLOC_OFFSET, szString, MAX_PATH);
+            WritePrivateProfileString(L"ExtractImageDlg", L"ylocOffset", szString, (LPCTSTR)strAppNameINI);
 
             GetDlgItemText(hDlg, IDC_OUTPUT_XSIZE, szString, MAX_PATH);
             WritePrivateProfileString(L"ExtractImageDlg", L"OutputXsize", szString, (LPCTSTR)strAppNameINI);
@@ -2953,7 +2896,7 @@ INT_PTR CALLBACK ResizeDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 
             int iRes;
             iRes = ResizeImage(InputFile, OutputFile, Xsize, Ysize, PixelSize);
-            if (iRes != 1) {
+            if (iRes != APP_SUCCESS) {
                 MessageMySETIappError(hDlg, iRes, L"Resize image error");
             }
             wcscpy_s(szCurrentFilename, OutputFile);
@@ -3165,7 +3108,7 @@ INT_PTR CALLBACK ReorderAlgDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 
             int iRes;
             iRes = ReorderAlg(InputFile, OutputFile, Xsize, Ysize, PixelSize, Algorithm, P1, P2, P3, Invert);
-            if (iRes != 1) {
+            if (iRes != APP_SUCCESS) {
                 MessageMySETIappError(hDlg, iRes, L"Algorithmic reorder image error\nCheck parameters");
             }
             wcscpy_s(szCurrentFilename, OutputFile);
@@ -3348,7 +3291,7 @@ INT_PTR CALLBACK StdDecimationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
 
             int iRes;
             iRes = StdDecimateImage(InputFile, OutputFile, Xsize, Ysize, PixelSize);
-            if (iRes != 1) {
+            if (iRes != APP_SUCCESS) {
                 MessageMySETIappError(hDlg, iRes, L"Resize image error");
             }
             wcscpy_s(szCurrentFilename, OutputFile);
@@ -3677,7 +3620,7 @@ INT_PTR CALLBACK ReplicationDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 
             int iRes;
             iRes = ReplicateImage(InputFile, OutputFile, Xsize, Ysize);
-            if (iRes != 1) {
+            if (iRes != APP_SUCCESS) {
                 MessageMySETIappError(hDlg, iRes, L"Resize image error");
             }
             wcscpy_s(szCurrentFilename, OutputFile);
@@ -3866,7 +3809,7 @@ INT_PTR CALLBACK MathConstantDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
             int iRes;
             int ArithmeticFlag;
             iRes = MathConstant2Image(InputFile, OutputFile, Value, Operation, Warn, &ArithmeticFlag);
-            if (iRes != 1) {
+            if (iRes != APP_SUCCESS) {
                     MessageMySETIappError(hDlg, iRes, L"constant math operation");
             }
             if (ArithmeticFlag) {
@@ -4496,7 +4439,7 @@ INT_PTR CALLBACK Image2StreamDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 
             int iRes;
             iRes = Image2Stream(hDlg, InputFile, OutputFile, BitDepth, Frames, Header, BitOrder, Invert);
-            if (iRes != 1) {
+            if (iRes != APP_SUCCESS) {
                 MessageMySETIappError(hDlg, iRes, L"Image2Stream error");
             }
             wcscpy_s(szCurrentFilename, OutputFile);
@@ -4968,7 +4911,6 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
         GetPrivateProfileString(L"BatchExtractImageDlg", L"ylocOffset", L"256", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_YLOC_OFFSET, szString);
 
-
         int ScalePixel;
         int Centered;
         int GenerateBMP;
@@ -5124,11 +5066,6 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
                 GenerateFileList = 1;
             }
 
-            int SaveDisplayResults;
-
-            SaveDisplayResults = DisplayResults;
-            DisplayResults = 0;
-
             // for Batch processing, cutup filename, reassemble as needed
             int err;
             WCHAR Drive[_MAX_DRIVE];
@@ -5142,7 +5079,7 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
                 _MAX_FNAME, Ext, _MAX_EXT);
             if (err != 0) {
                 MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-                return -2;
+                return APPERR_FILEOPEN;
             }
 
             FILE* FileList = NULL;
@@ -5156,26 +5093,26 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
                 err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, L"FileList", L".txt");
                 if (err != 0) {
                     MessageBox(hDlg, L"Could not creat output filename", L"Batch filename", MB_OK);
-                    return -2;
+                    return APPERR_FILEOPEN;
                 }
 
                 ErrNum = _wfopen_s(&FileList, NewFilename, L"w");
                 if (FileList == NULL) {
                     MessageBox(hDlg, L"Could not open file list output file", L"File I/O", MB_OK);
-                    return -2;
+                    return APPERR_FILEOPEN;
                 }
 
                 // reassemble filename for batch file
                 err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, L"BatchFileList", L".txt");
                 if (err != 0) {
                     MessageBox(hDlg, L"Could not creat output filename", L"Batch filename", MB_OK);
-                    return -2;
+                    return APPERR_FILEOPEN;
                 }
 
                 ErrNum = _wfopen_s(&BatchFileList, NewFilename, L"w");
                 if (FileList == NULL) {
                     MessageBox(hDlg, L"Could not open file list output file", L"File I/O", MB_OK);
-                    return -2;
+                    return APPERR_FILEOPEN;
                 }
 
             }
@@ -5193,7 +5130,7 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
                         if (FileList != NULL) {
                             fclose(FileList);
                         }
-                        return -2;
+                        return APPERR_FILEOPEN;
                     }
 
                     err = ImageExtract(hDlg, InputFile, NewFilename,
@@ -5224,7 +5161,7 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
                             if (FileList != NULL) {
                                 fclose(FileList);
                             }
-                            return -2;
+                            return APPERR_FILEOPEN;
                         }
                         fwprintf_s(BatchFileList, L"%s\n\n", BatchListName);
                     }
@@ -5238,7 +5175,7 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
                                 fclose(FileList);
                             }
                             MessageBox(hDlg, L"Could not creat output bmp filename", L"Batch filename", MB_OK);
-                            return -2;
+                            return APPERR_FILEOPEN;
                         }
                         SaveBMP(BMPfilename, NewFilename, DefaultRBG, AutoScaleResults);
 
@@ -5253,8 +5190,6 @@ INT_PTR CALLBACK BatchExtractImageDlg(HWND hDlg, UINT message, WPARAM wParam, LP
             if (BatchFileList != NULL) {
                 fclose(BatchFileList);
             }
-
-            DisplayResults = SaveDisplayResults;
             MessageBox(hDlg, L"Completed", L"Success",MB_OK);
 
             return (INT_PTR)TRUE;

@@ -149,6 +149,10 @@
 //                      Correction, fixed extract image when extracting multiframe files.
 //                      Added, Batch extract image
 // V1.2.12.2 2023-11-21 Correction, filename buffer overwrite corrected when generating batchfilelist.txt            
+// V1.3.1.1  2023-12-28 Corrected Open/Save for folder selection
+//                      Merged the bitmap viewer from MySETIviewer
+//                      Replaced application error numbers with #define to improve clarity
+//                      Chnaged the batch processing to also display results after each step
 // 
 // MySETIapp.cpp : Defines the entry point for the application.
 //
@@ -169,11 +173,14 @@
 #include "framework.h"
 #include <atlstr.h>
 #include <strsafe.h>
-#include "atlpath.h"
-#include "string.h"
+#include <atlpath.h>
+#include <string.h>
 #include "MySETIapp.h"
-#include "FileFunctions.h"
+#include "AppErrors.h"
 #include "imaging.h"
+#include "FileFunctions.h"
+#include "AppFunctions.h"
+#include "ImageDialog.h"
 
 #define MAX_LOADSTRING 100
 
@@ -185,11 +192,12 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 WCHAR szBMPFilename[MAX_PATH] = L"";    // used to save last results file
 WCHAR szCurrentFilename[MAX_PATH] = L"";    // used to save last results file
 WCHAR szTempImageFilename[MAX_PATH] = L"";    // used as a temporary image file for processing
-int DisplayResults = 0;
-int AutoScaleResults = 0;
-int DefaultRBG = 0;
-int AutoSize = 0;
-int AutoPNG = 0;
+BOOL DisplayResults = FALSE;
+BOOL AutoScaleResults = FALSE;
+BOOL DefaultRBG = FALSE;
+BOOL AutoSize = FALSE;
+BOOL AutoPNG = FALSE;
+BOOL ShowStatusBar = TRUE;     // Display Status bar
 
 // The following is from the version information in the resource file
 CString strProductName;
@@ -200,18 +208,18 @@ CString strAppNameEXE;
 CString strAppNameINI;
 
 // handles for modeless dialogs and windows
-HWND hwndImageDisplay = NULL;  // handle for modeless Image window
+ImageDialog* ImgDlg = NULL;     // This class is used to support displaying the Display image in a window
+                                // on the desktop.  This also includes scaling and panning of the displayed image
 
 // handle to the main application window
 //  needed to do things like check or uncheck a menu item in the main app
 HWND hwndMain = NULL;
-HWND hwndImage = NULL;
+HWND hwndImage = NULL;   // Handle for modeless Image Dialog window (this displays the image in a window)
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-void                MessageMySETIappError(HWND hWnd, int ErrNo, const wchar_t* Title);
 
 // Declaration for callback dialog procedures in other modules
 
@@ -259,6 +267,11 @@ INT_PTR CALLBACK    ReorderBlocksImageDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    FindAPrimeDlg(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    BatchExtractImageDlg(HWND, UINT, WPARAM, LPARAM);
 
+//******************************************************************************
+//
+// Application entry point
+//
+//******************************************************************************
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPWSTR    lpCmdLine,
@@ -267,8 +280,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: Place code here.
-    // HeapSetInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
+    HeapSetInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
 
     // 
     // Get version information, executable name including path to executable location
@@ -332,12 +344,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 }
 
 
-
+//******************************************************************************
 //
 //  FUNCTION: MyRegisterClass()
 //
-//  PURPOSE: Registers the window class.
+//  PURPOSE: Registers the window class.   This is NOT a c++ class.
+//  This is a Windows registration operation
 //
+//******************************************************************************
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
@@ -359,6 +373,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     return RegisterClassExW(&wcex);
 }
 
+//******************************************************************************
 //
 //   FUNCTION: InitInstance(HINSTANCE, int)
 //
@@ -369,6 +384,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        In this function, we save the instance handle in a global variable and
 //        create and display the main program window.
 //
+//******************************************************************************
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
@@ -381,16 +397,48 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 
+   int ResetWindows = GetPrivateProfileInt(L"GlobalSettings", L"ResetWindows", 0, (LPCTSTR)strAppNameINI);
+
    // restore main window position from last execution
-   CString csString = L"MainWindow";
-   RestoreWindowPlacement(hWnd, csString);
+   if (!ResetWindows) {
+       CString csString = L"MainWindow";
+       RestoreWindowPlacement(hWnd, csString);
+   }
 
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
 
-   // load globals
+   // this must be done before ImageDialog class created
+   ShowStatusBar = GetPrivateProfileInt(L"GlobalSettings", L"ShowStatusBar", 1, (LPCTSTR)strAppNameINI);
+
+   ImgDlg = new ImageDialog;
+   
+   // create image window
+   hwndImage = CreateDialog(hInst, MAKEINTRESOURCE(IDD_IMAGE), hwndMain, ImageDlg);
    hwndMain = hWnd;
+
+   // load globals
+   int iRes;
+   float Scale, Xpos, Ypos;
    WCHAR szString[MAX_PATH];
+
+   GetPrivateProfileString(L"GlobalSettings", L"scaleFactor",L"1.0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+   iRes = swscanf_s(szString, L"%f", &Scale);
+   if (iRes != 1) {
+       Scale = 1.0f;
+   }
+   GetPrivateProfileString(L"GlobalSettings", L"PanOffsetX", L"0.0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+   iRes = swscanf_s(szString, L"%f", &Xpos);
+   if (iRes != 1) {
+       Xpos = 1.0f;
+   }
+   GetPrivateProfileString(L"GlobalSettings", L"PanOffsetY", L"0.0", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
+   iRes = swscanf_s(szString, L"%f", &Ypos);
+   if (iRes != 1) {
+       Ypos = 1.0f;
+   }
+   ImgDlg->SetScalePos(Scale, Xpos, Ypos);
+
    GetPrivateProfileString(L"GlobalSettings", L"BMPresults", L"", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
    wcscpy_s(szBMPFilename, szString);
 
@@ -406,9 +454,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    AutoSize = GetPrivateProfileInt(L"GlobalSettings", L"AutoSize", 0, (LPCTSTR)strAppNameINI);
    AutoPNG = GetPrivateProfileInt(L"GlobalSettings", L"AutoPNG", 1, (LPCTSTR)strAppNameINI);
 
+   WritePrivateProfileString(L"GlobalSettings", L"ResetWindows", L"0", (LPCTSTR)strAppNameINI);
+
    return TRUE;
 }
 
+//******************************************************************************
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -418,7 +469,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //  WM_PAINT    - Paint the main window
 //  WM_DESTROY  - post a quit message and return
 //
-//
+//******************************************************************************
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
@@ -446,13 +497,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     wcscpy_s(szCurrentFilename, pszFilename);
                     CoTaskMemFree(pszFilename);
 
-                    if (!IsWindow(hwndImage)) {
-                        hwndImage = CreateDialog(hInst, MAKEINTRESOURCE(IDD_IMAGE), hWnd, ImageDlg);
-                    }
                     int iRes;
 
                     iRes = DisplayImage(szCurrentFilename);
-                    if (iRes != 1) {
+                    if (iRes != APP_SUCCESS) {
                         MessageBox(hWnd, L"Error opening image/BMP for display\nMake sure BMP file set inProperties->Settings\n", L"File Incompatible", MB_OK);
                     }
                     else {
@@ -467,7 +515,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
                 int iRes;
                 iRes = ImportBMP(hWnd);
-                if (iRes != 1) {
+                if (iRes != APP_SUCCESS) {
                     MessageMySETIappError(hWnd, iRes,L"BMP file import");
                 }
                 break;
@@ -476,7 +524,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_FILE_HEX2BINARY:
                 int iRes;
                 iRes = HEX2Binary(hWnd);
-                if (iRes != 1) {
+                if (iRes != APP_SUCCESS) {
                     MessageMySETIappError(hWnd, iRes, L"Convert HEX to Binary file");
                 }
                 break;
@@ -490,7 +538,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
                 int iRes;
                 iRes = CamIRaImport(hWnd);
-                if (iRes != 1) {
+                if (iRes != APP_SUCCESS) {
                     MessageMySETIappError(hWnd, iRes, L"CamIRa IMG file import");
                 }
                 break;
@@ -685,7 +733,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_PROPERTIES_FINDAPRIME:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_PROPERTIES_FINDAPRIME), hWnd, FindAPrimeDlg);
                 break;
-                
+
+            case IDM_RESET_ZOOM:
+            {
+                int x, y;
+                ImgDlg->SetScale(1.0f);
+                ImgDlg->GetDisplaySize(&x, &y);
+                if (x && y) {
+                    ImgDlg->Repaint();
+                }
+                break;
+            }
+
+            case IDM__RESET_PANXY:
+            {
+                int x, y;
+                ImgDlg->SetPan(0.0f, 0.0f);
+                ImgDlg->GetDisplaySize(&x, &y);
+                if (x && y) {
+                    ImgDlg->Repaint();
+                }
+                break;
+            }
+
+            case IDM_RESET_WINDOW_POSITIONS:
+                WritePrivateProfileString(L"GlobalSettings", L"ResetWindows", L"1", (LPCTSTR)strAppNameINI);
+                break;
+
             case IDM_EXIT:
                 DestroyWindow(hWnd);
                 break;
@@ -694,14 +768,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // TODO: Add any drawing code that uses hdc here...
-            EndPaint(hWnd, &ps);
-        }
-        break;
+
     case WM_DESTROY:
         {   // save window position/size data
             CString csString = L"MainWindow";
@@ -716,47 +783,3 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-//******************************************************************************
-//
-// FoldImageRight
-//
-//******************************************************************************
-void MessageMySETIappError(HWND hWnd, int ErrNo, const wchar_t* Title) {
-    switch (ErrNo) {
-    case 1:
-        MessageBox(hWnd, L"Success", Title, MB_OK);
-        break;
-
-    case 0:
-        MessageBox(hWnd, L"Parameter or format invalid", Title, MB_OK);
-        break;
-
-    case -1:
-        MessageBox(hWnd, L"Memory allocation failure\nexit application", Title, MB_OK);
-        break;
-
-    case -2:
-        MessageBox(hWnd, L"File was not found or could not be opened", Title, MB_OK);
-        break;
-
-    case -3:
-        MessageBox(hWnd, L"File read error", Title, MB_OK);
-        break;
-
-    case -4:
-        MessageBox(hWnd, L"Invalid file type", Title, MB_OK);
-        break;
-
-    case -5:
-        MessageBox(hWnd, L"Sizes mismatched", Title, MB_OK);
-        break;
-
-    case -6:
-        MessageBox(hWnd, L"Not yet implemented", Title, MB_OK);
-        break;
-
-    default:
-        break;
-    }
-    return;
-}

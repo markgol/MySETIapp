@@ -45,17 +45,21 @@
 //                      Changed, Bistream to image file, Changed dialog to clarify which
 //                        bit order flag applies to input file and which applies ot output file.
 //                      Changed, Extract Btistream to text file dialogs, added flag for input file bit order swap
+// V1.3.1.1 2023-12-28  Replaced application error numbers with #define to improve clarity
+//                      Changed batch processing for images to show result of each image after each step
 //
 #include "framework.h"
 #include <windowsx.h>
 #include <time.h>
 #include <stdio.h>
 #include <atlstr.h>
+#include <strsafe.h>
+#include "AppErrors.h"
+#include "ImageDialog.h"
 #include "globals.h"
 #include "BitStream.h"
 #include "imaging.h"
 #include "FileFunctions.h"
-#include "strsafe.h"
 
 //*******************************************************************
 //
@@ -1001,11 +1005,6 @@ void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     int PrologueSize, int BlockHeaderBits, int NumBlockBodyBits, int BlockNum, int xsize, int xsizeEnd, 
     int BitDepth, int BitOrder, int BitScale, int Invert, int InputBitOrder)
 {
-    int SaveDisplayResults;
-
-    SaveDisplayResults = DisplayResults;
-    DisplayResults = 0;
-
     for (int CurrentXsize = xsize; CurrentXsize <= xsizeEnd; CurrentXsize++) {
         // for Batch processing, cutup filename, reassemble with index number (Kernel)
         int err;
@@ -1019,7 +1018,6 @@ void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
             _MAX_FNAME, Ext, _MAX_EXT);
         if (err != 0) {
             MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-            DisplayResults = SaveDisplayResults;
             return;
         }
         // change the fname portion to add _kernel# 1 based
@@ -1034,15 +1032,13 @@ void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
         err = _wmakepath_s(NewFilename, _MAX_PATH, Drive, Dir, NewFname, Ext);
         if (err != 0) {
             MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-            DisplayResults = SaveDisplayResults;
             return;
         }
         // create BMP of file
-        if (SaveDisplayResults) {
+        if (DisplayResults) {
             err = _wmakepath_s(BMPfilename, _MAX_PATH, Drive, Dir, NewFname, L".bmp");
             if (err != 0) {
                 MessageBox(hDlg, L"Could not creat output filename", L"Batch File I/O", MB_OK);
-                DisplayResults = SaveDisplayResults;
                 return;
             }
         }
@@ -1061,12 +1057,11 @@ void BatchBitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
             MessageBox(hDlg, pszMessageBuf, L"Batch process Bit stream to image file", MB_OK);
             return;
         }
-        if (SaveDisplayResults) {
+        if (DisplayResults) {
             SaveBMP(BMPfilename, NewFilename, FALSE, AutoScaleResults);
         }
     }
 
-    DisplayResults = SaveDisplayResults;
     return;
 }
 
@@ -1119,35 +1114,35 @@ int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
 
     if (xsize <= 0) {
         MessageBox(hDlg, L"x size must be >= 1", L"File I/O", MB_OK);
-        return 0;
+        return APPERR_PARAMETER;
     }
 
     if (NumBlockBodyBits <= 0) {
         MessageBox(hDlg, L"# bits in block >= 1", L"File I/O", MB_OK);
-        return 0;
+        return APPERR_PARAMETER;
     }
 
     if (BitDepth <= 0 || BitDepth > 32) {
         MessageBox(hDlg, L"1 <= Image bit depth <= 32", L"File I/O", MB_OK);
-        return 0;
+        return APPERR_PARAMETER;
     }
 
     if (BitDepth != 1 && BitScale) {
         MessageBox(hDlg, L"Scale Binary can only be used if Image bit depth is 1", L"File I/O", MB_OK);
-        return 0;
+        return APPERR_PARAMETER;
     }
 
     ErrNum = _wfopen_s(&In, InputFile, L"rb");
     if (In==NULL) {
         MessageBox(hDlg, L"Could not open input file", L"File I/O", MB_OK);
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     ErrNum = _wfopen_s(&OutRaw, OutputFile, L"wb");
     if (OutRaw==NULL) {
         fclose(In);
         MessageBox(hDlg, L"Could not open raw output file", L"File I/O", MB_OK);
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     // Initialize image file header
@@ -1323,7 +1318,7 @@ int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
                     if (DisplayResults) {
                         DisplayImage(OutputFile);
                     }
-                    return 1;
+                    return APP_SUCCESS;
                 }
             }
         }
@@ -1334,7 +1329,7 @@ int BitStream2Image(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile,
     if (DisplayResults) {
         DisplayImage(OutputFile);
     }
-    return 1;
+    return APP_SUCCESS;
 }
 
 //*******************************************************************
@@ -1375,27 +1370,27 @@ int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Bi
     ErrNum = _wfopen_s(&In, InputFile, L"r");
     if (In == NULL) {
         MessageBox(hDlg, L"Could not open input file", L"File I/O", MB_OK);
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     ErrNum = _wfopen_s(&Out, OutputFile, L"wb");
     if (Out == NULL) {
         fclose(In);
         MessageBox(hDlg, L"Could not open raw output file", L"File I/O", MB_OK);
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     while (!feof(In)) {
         iRes = fscanf_s(In, "%d", &BitValue);
-        if (iRes != 1) {
+        if (iRes != APP_SUCCESS) {
             fclose(Out);
             fclose(In);
-            return -3;
+            return APPERR_FILEREAD;
         }
         if (BitValue < 0) {
             fclose(Out);
             fclose(In);
-            return -3;
+            return APPERR_FILEREAD;
         }
         if (BitValue > 0) {
             if (BitOrder) {
@@ -1427,7 +1422,7 @@ int ConvertText2BitStream(HWND hDlg, WCHAR* InputFile, WCHAR* OutputFile, int Bi
 
     fclose(In);
     fclose(Out);
-    return 1;
+    return APP_SUCCESS;
 }
 
 //*******************************************************************
@@ -1482,12 +1477,12 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
     ErrNum = _wfopen_s(&In, InputFile, L"rb");
     if (In == NULL) {
         MessageBox(hDlg, L"Could not open input file", L"File I/O", MB_OK);
-        return -2;
+        return APPERR_FILEOPEN;
     }
     if (fseek(In, SkipBytes, SEEK_SET) != 0) {
         fclose(In);
         MessageBox(hDlg, L"bad format, file, too small\nNot likely SPP binary file", L"File I/O", MB_OK);
-        return -3;
+        return APPERR_FILEREAD;
     }
 
     if (SaveSPP) {
@@ -1496,7 +1491,7 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
         if (Out == NULL) {
             fclose(In);
             MessageBox(hDlg, L"Could not open summary output file", L"File I/O", MB_OK);
-            return -2;
+            return APPERR_FILEOPEN;
         }
         fprintf(Out, "   SPP#, PVN, Type, SHflag,   APID, SeqFlg, SeqCount, DataLen, Data Field ->\n");
     }
@@ -1508,14 +1503,14 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
         }
         fclose(In);
         MessageBox(hDlg, L"Could not open APID output file", L"File I/O", MB_OK);
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     fprintf(OutAPID, "   SPP#, PVN, Type, SHflag,   APID, SeqFlg, SeqCount, DataLen, Data Field ->\n");
 
     while (!feof(In)) {
-        iRes = fread(&PackedPriHeader, sizeof(PackedPriHeader), 1, In);
-        if (iRes != 1) {
+        iRes = (int) fread(&PackedPriHeader, sizeof(PackedPriHeader), 1, In);
+        if (iRes != APP_SUCCESS) {
             if (NumPackets == 0) {
                 MessageBox(hDlg, L"Input file is wrong type", L"File I/O error", MB_OK);
                 if (SaveSPP) {
@@ -1523,7 +1518,7 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
                 }
                 fclose(OutAPID);
                 fclose(In);
-                return -3;
+                return APPERR_FILEREAD;
             }
             // generate summary
             TCHAR pszMessageBuf[MAX_PATH];
@@ -1536,7 +1531,7 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
             }
             fclose(In);
             fclose(OutAPID);
-            return 1;
+            return APP_SUCCESS;
         }
 
         // SPP header read
@@ -1559,7 +1554,7 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
             }
             fclose(OutAPID);
             fclose(In);
-            return 0;
+            return APPERR_PARAMETER;
         }
 
         // add SPP data field length, this includes secondary header, user data, and CRC/checksum
@@ -1587,7 +1582,7 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
                     TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
                     NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
                 MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-                return -3;
+                return APPERR_FILEREAD;
             }
             continue;
         }
@@ -1613,7 +1608,7 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
                     TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
                     NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
                 MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-                return -3;
+                return APPERR_FILEREAD;
             }
             continue;
         }
@@ -1646,10 +1641,10 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
                     TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
                     NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
                 MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-                return -3;
+                return APPERR_FILEREAD;
             }
             
-            iRes = fread(DataField, 1, PriHeader.DataLength, In);
+            iRes = (int) fread(DataField, 1, PriHeader.DataLength, In);
             if (iRes != PriHeader.DataLength) {
                 delete[] DataField;
                 if (SaveSPP) {
@@ -1663,7 +1658,7 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
                     TEXT("Processed:\n# of total packets: %d\n# idle packets: %d\n# of telemtry packets: %d\n# of telecommand packets: %d\n# matching APID packets: %d\nTotal bytes processeed: %d"),
                     NumPackets, NumIdlePackets, NumTMpackets, NumTCpackets, NumAPIDmatches, TotalBytes);
                 MessageBox(hDlg, pszMessageBuf, L"Completed", MB_OK);
-                return -3;
+                return APPERR_FILEREAD;
             }
 
             // skip sepcifed number of bytes at the beginning of the data field, nominally the secondary header
@@ -1688,7 +1683,7 @@ int ExtractSPP(HWND hDlg, WCHAR* InputFile, WCHAR* APIDoutputFile, WCHAR* Output
     fclose(OutAPID);
     fclose(In);
 
-    return 1;
+    return APP_SUCCESS;
 }
 
 //*******************************************************************
@@ -1716,12 +1711,12 @@ int DecodeSPP(SPP_PRIMARY_HEADER* PackedPriHeader, SPP_UNPACKED_PRIMARY_HEADER* 
     PriHeader->DataLength = PackedPriHeader->DataLength+1; // need to increment by 1 to be accurate
 
     if (PriHeader->PVN != 0) {
-        return 0;
+        return APPERR_PARAMETER;
     }
 
     // strict application of ECSS-E-ST-70-41C or otherwise only apply CCSDS 133.0-B-1
     if (!Strict) {
-        return 1;
+        return APP_SUCCESS;
     }
 
     // flag incorrect settings in SPP primary header
@@ -1730,14 +1725,14 @@ int DecodeSPP(SPP_PRIMARY_HEADER* PackedPriHeader, SPP_UNPACKED_PRIMARY_HEADER* 
     if (PriHeader->Type == 0 && PriHeader->SecHeaderFlag != 1) {
         // IDLE packets and spacecraft time packets do not have secondary header
         if (PriHeader->APID != 0x7ff && PriHeader->APID !=0x000) {
-            return 0;
+            return APPERR_PARAMETER;
         }
     }
     if (PriHeader->SeqFlag != 3) {
-        return 0;
+        return APPERR_PARAMETER;
     }
 
-    return 1;
+    return APP_SUCCESS;
 }
 
 //*******************************************************************
@@ -1851,7 +1846,7 @@ int FindAPrime(HWND hDlg, WCHAR* Filename, int Start, int End)
     ErrNum = _wfopen_s(&Out, Filename, L"w");
     if (Out == NULL) {
         MessageBox(hDlg, L"Could not open raw output file", L"File I/O", MB_OK);
-        return -2;
+        return APPERR_FILEOPEN;
     }
 
     fprintf(Out, "Prime numbers between %d and %d:\n", Start, End);
@@ -1863,19 +1858,19 @@ int FindAPrime(HWND hDlg, WCHAR* Filename, int Start, int End)
         }
     }
     fclose(Out);
-    return 1;
+    return APP_SUCCESS;
 }
 
 // from ChatGPT, simple prime calcuator, only good for smaller prime numbers
 // Function to check if a number is prime
-int is_prime(int num) {
+BOOL is_prime(int num) {
     if (num <= 1) {
-        return 0;  // Not prime
+        return FALSE;  // Not prime
     }
     for (int i = 2; i * i <= num; ++i) {
         if (num % i == 0) {
-            return 0;  // Not prime
+            return FALSE;  // Not prime
         }
     }
-    return 1;  // Prime
+    return TRUE;  // Prime
 }

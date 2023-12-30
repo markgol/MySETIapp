@@ -28,6 +28,8 @@
 // V1.2.6.1 2023-09-24  Added temp image filename to app settings.  For use in debugging
 //                      functions by saving intermediate results.
 // V1.2.10.1 2023-11-2  Changed, global Setting, added auto save PNG flag when creating a BMP file
+// V1.3.1.1 2023-12-28  Replaced application error numbers with #define to improve clarity
+//                      Moved the .exe and .ini file info to the About dialog
 //
 // Global Settings dialog box handler
 // 
@@ -40,7 +42,10 @@
 #include <vector>
 #include <atlstr.h>
 #include <strsafe.h>
+#include "AppErrors.h"
+#include "ImageDialog.h"
 #include "Globals.h"
+#include "imaging.h"
 #include "FileFunctions.h"
 
 //*******************************************************************************
@@ -64,9 +69,6 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
         GetPrivateProfileString(L"GlobalSettings", L"TempImageFilename", L"working.raw", szString, MAX_PATH, (LPCTSTR)strAppNameINI);
         SetDlgItemText(hDlg, IDC_IMG_TEMP, szString);
 
-        SetDlgItemText(hDlg, IDC_INI_FILE, strAppNameINI);
-        SetDlgItemText(hDlg, IDC_EXE_FILE, strAppNameEXE);
-
         //IDC_SETTINGS_DISPLAY_RESULTS
         iRes = GetPrivateProfileInt(L"GlobalSettings", L"DisplayResults", 1, (LPCTSTR)strAppNameINI);
         if (iRes != 0) {
@@ -88,6 +90,11 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
         iRes = GetPrivateProfileInt(L"GlobalSettings", L"AutoPNG", 1, (LPCTSTR)strAppNameINI);
         if (iRes != 0) {
             CheckDlgButton(hDlg, IDC_SETTINGS_AUTO_PNG, BST_CHECKED);
+        }
+        
+        iRes = GetPrivateProfileInt(L"GlobalSettings", L"ShowStatusBar", 1, (LPCTSTR)strAppNameINI);
+        if (iRes != 0) {
+            CheckDlgButton(hDlg, IDC_SETTINGS_STATUSBAR, BST_CHECKED);
         }
 
         return (INT_PTR)TRUE;
@@ -184,6 +191,20 @@ INT_PTR CALLBACK GlobalSettingsDlg(HWND hDlg, UINT message, WPARAM wParam, LPARA
             else {
                 WritePrivateProfileString(L"GlobalSettings", L"AutoPNG", L"0", (LPCTSTR)strAppNameINI);
                 AutoPNG = 0;
+            }
+
+            // IDC_SETTINGS_STATUSBAR
+            if (IsDlgButtonChecked(hDlg, IDC_SETTINGS_STATUSBAR) == BST_CHECKED) {
+                WritePrivateProfileString(L"GlobalSettings", L"ShowStatusBar", L"1", (LPCTSTR)strAppNameINI);
+                ShowStatusBar = TRUE;
+            }
+            else {
+                WritePrivateProfileString(L"GlobalSettings", L"ShowStatusBar", L"0", (LPCTSTR)strAppNameINI);
+                ShowStatusBar = FALSE;
+            }
+            if (hwndImage && ImgDlg->StatusBarExists()) {
+                ImgDlg->ShowStatusBar(ShowStatusBar);
+                ImgDlg->Repaint();
             }
 
             EndDialog(hDlg, LOWORD(wParam));

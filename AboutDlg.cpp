@@ -29,8 +29,9 @@
 #include <vector>
 #include <atlstr.h>
 #include <strsafe.h>
+#include "ImageDialog.h"
 #include "Globals.h"
-#include "FileFunctions.h"
+#include "AppFunctions.h"
 
 // Message handler for about box.
 INT_PTR CALLBACK AboutDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -58,10 +59,14 @@ INT_PTR CALLBACK AboutDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         else
         {
             SetDlgItemText(hDlg, IDC_ABOUT_NAME, (LPCWSTR)L"MySETIapp");
-            SetDlgItemText(hDlg, IDC_ABOUT_VERSION, (LPCWSTR)L"2.0.0.1");
+            SetDlgItemText(hDlg, IDC_ABOUT_VERSION, (LPCWSTR)L"1.3.1.1");
             SetDlgItemText(hDlg, IDC_ABOUT_AUTHOR, (LPCWSTR)L"GNU GPL V3.0 or later");
             SetDlgItemText(hDlg, IDC_ABOUT_COPYRIGHT, (LPCWSTR)L"(C) 2023, Mark Stegall");
         }
+
+        SetDlgItemText(hDlg, IDC_INI_FILE, strAppNameINI);
+        SetDlgItemText(hDlg, IDC_EXE_FILE, strAppNameEXE);
+
         return (INT_PTR)TRUE;
 
     case WM_COMMAND:
